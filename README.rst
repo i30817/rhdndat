@@ -1,0 +1,83 @@
+rhdndat: www.romhacking.net dat creator and update checker
+==========================================================
+
+*rhdndat* finds triples (rom file, softpatch file, version file) on the same 
+directory and creates a clrmamepro entry on stdout or file for the result of 
+each softpatch. It can also serve as a notifier that a update is required by 
+comparing local versions to remote romhacking.net versions.
+
+A softpatch filename is: 'rom filename - rom extension + patch extension' or
+'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing
+hardpatched roms and revert patches).
+
+version file is simply named 'version' and has a version number line followed 
+by a romhacking.net url line, repeated. These correspond to each hack or 
+translation on the softpatch.
+
+Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
+with xdelta) on path or the same directory.
+
+Arguments
+---------
+
+rhdndat [-h] [-o output file] [-d dat file] [-i] [-t] search-path rom-type
+
+positional arguments:
+  search-path     directory tree to search for (rom, patches and version) files
+                  
+                  If there is no tuple but a patch of the form 
+                  'rom_filename.reset.xdelta' is found, rom is assumed to be 
+                  hardpatched, -d will search for the checksum of the reseted 
+                  rom and the output will be the checksums of 'rom'
+                  
+  rom-type        extension (without dot) of roms to find patches for
+
+optional arguments:
+  -h, --help      show this help message and exit
+  -o output-file  ouput file, if ommited writes to stdout
+  -d xml-file     forces to pick up the translations game names from the rom 
+                  checksum in this file, if checksum not in xml, the program 
+                  picks names from hack page 
+                  
+  -i              used with -d, ignored otherwise - don't allow unrecognized 
+                  roms to be added even if the patches have a romhacking.net 
+                  page
+                  
+  -t              only test version numbers against remote version, 
+                  ignore -o, -d or -i, works without a patch present
+
+Memory Requirements
+-------------------
+
+This tool uses named FIFO files to calculate checksums when it has to patch, so
+not much memory is consumed. However, for large roms like isos, you should make
+sure you're using xdelta instead of bps, because the flips tries to read the 
+whole file into memory to create or apply a patch.
+
+Install
+-------
+
+rhdndat requires python 3.5 or later.
+
+`The source for this project is available here
+<https://github.com/i30817/rhdndat>`_.
+
+The project can be installed on linux machines by installing pip3 and running
+`pip3 install --user rhdndat` or `pip3 install --user
+https://github.com/i30817/rhdndat/archive/master.zip` for the latest master,
+but you'll have to provide your own flips and xdelta executables in path for 
+the ips, bps and xdelta support.
+
+Credits
+---------
+
+.. class:: tablacreditos
+
++-------------------------------------------------+----------------------------------------------------+
+| Alcaro for helpful comments and for flips       | https://github.com/Alcaro/Flips                    |
++-------------------------------------------------+----------------------------------------------------+
+| xdelta for being fast and useful                | http://xdelta.org/                                 |
++-------------------------------------------------+----------------------------------------------------+
+| www.romhacking.net for being a awesome resource | http://www.romhacking.net/                         |
++-------------------------------------------------+----------------------------------------------------+
+
