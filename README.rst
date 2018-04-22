@@ -8,7 +8,8 @@ rhdndat: romhacking.net_ dat creator and update checker
 
 A softpatch filename is: 'rom filename - rom extension + patch extension' or 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing hardpatched roms and revert patches).
 
-version file is simply named 'version' and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
+version file is simply named 'version' and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch. If a version file exists but no patch, the rom is assumed to be hardpatched.
+
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
@@ -34,9 +35,8 @@ optional arguments:
                   checksum in this file, if checksum not in xml, the program 
                   picks names from hack page 
                   
-  -i              used with -d, ignored otherwise - don't allow unrecognized 
-                  roms to be added even if the patches have a romhacking.net 
-                  page
+  -i              don't allow unrecognized roms to be added even if the 
+                  patches have a romhacking.net page
                   
   -t              only test version numbers against remote version, 
                   ignore -o, -d or -i, works without a patch present

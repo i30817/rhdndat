@@ -392,7 +392,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
             possible_metadata = os.path.join(dirpath,'version')
 
             if not os.path.isfile(possible_metadata):
-                if patches:
+                if patches: 
                     print("warning: '{}' : has patches without a version file".format(rom), file=sys.stderr)
                 continue
             
@@ -401,28 +401,27 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                 
                 if test_versions_only:
                     continue
-
+                
+                softpatch = True
                 if not patches:
-                    continue
+                    if unknown_remove:
+                        raise ScriptError("no patches and a version file, hardpatch possible, but -i given")
+                    print("warning: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom), file=sys.stderr)
+                    softpatch = False
+
                 if len(patches) > 1:
                     raise ScriptError("multiple possible patches found")
-                patch = patches[0]
+
+                if softpatch:
+                    patch = patches[0]
 
                 #if using dat file for name, find the rom on dat
                 rom_title = None
-                if dat:
-                    #bps roms have 12 bytes footers with the source, destination and patch crc32s
-                    #unfortunately, this doesn't work if the dat we're working with skips headers
-                    #(except for SNES headers, which is the one header bps ignores when creating/applying a patch)
-
-                    #SNES headers are kept if they exist in the source for bps and the bps applies to mismatching
-                    #patch/source if the header is the only difference.
-                    #if the rom is headered and the dat has only unheadered checksums:
-                    #The 'if' branch won't fail on that case, but the final checksum will be wrong but not warned of
-                    #For this reason, flips is passed '--exact' to fail later on snes header mismatches.
-                    #This + always unheadered snes sources + always unheadered snes dat prevents this issue at the
-                    #cost of the user maybe needing to remake the patch for unheadered rom manually.
+                if dat and softpatch:
                     if skip_bytes == 0 and (patch.endswith(".bps") or patch.endswith(".BPS")):
+                        #bps roms have 12 bytes footers with the source, destination and patch crc32s
+                        #unfortunately, this doesn't work if the dat we're working with skips headers
+                        #(except for SNES headers, which is the one header bps ignores when creating/applying a patch)
                         dat_crc32 = None
                         target = None
                         with open(patch, 'rb') as p:
@@ -455,7 +454,8 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                 
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 checksums_generator = get_checksums()
-                if patch.endswith(".reset.xdelta"):
+                #hardpatch
+                if not softpatch or patch.endswith(".reset.xdelta"):
                     (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
                 else:
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
@@ -488,7 +488,8 @@ hardpatched roms and revert patches).
 
 version file is simply named 'version' and has a version number line followed 
 by a romhacking.net url line, repeated. These correspond to each hack or 
-translation on the softpatch.
+translation on the softpatch. If a version file exists but no patch, the rom
+is assumed to be hardpatched.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
 with xdelta) on path or the same directory.""")
@@ -517,9 +518,8 @@ picks names from hack page
     """))
     parser.add_argument('-i', action='store_true', 
 help=textwrap.dedent("""\
-used with -d, ignored otherwise - don\'t allow unrecognized 
-roms to be added even if the patches have a romhacking.net 
-page
+don\'t allow unrecognized roms to be added even if the 
+patches have a romhacking.net page
 
     """))
     parser.add_argument('-t', action='store_true', 
