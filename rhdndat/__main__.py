@@ -326,9 +326,18 @@ def get_romhacking_data(rom, possible_metadata):
             language = tmp
         assert ( tmp == None or tmp == language ), 'language of a translation should never change with a addendum'
 
+        authors = info.find("th", string="Released By").nextSibling
+        authors_str = authors.string
+        if not authors_str:
+            authors = authors.findAll("a")
+            authors_str = authors[0].string
+            for author in authors[1:-1]:
+                authors_str += ", {}".format(author.string)
+            authors_str += " and {}".format(authors[-1].string)
+
         metadata += [(
             info.find("div").find("div").string, #main title
-            info.find("th", string="Released By").nextSibling.string,
+            authors_str,
             version, #the version we actually have
             url
         )]
