@@ -1,8 +1,8 @@
 rhdndat: romhacking.net_ dat creator and update checker
+=======================================================
 
 .. _romhacking.net: http://www.romhacking.net
 
-==========================================================
 
 *rhdndat* finds triples (rom file, softpatch file, version file) on the same 
 directory and creates a clrmamepro entry on stdout or file for the result of 
