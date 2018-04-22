@@ -60,7 +60,7 @@ The project can be installed on recent linux machines with pip3 by installing rh
 
 .. [PyPI] ``pip3 install --user rhdndat``
 .. [github] ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip``
-(these may fail to execute if your OS doesn't add the pip3 install - ~/.local/bin in linux - dir to path)
+(these may fail to execute if your OS doesn't add the pip3 install ``~/.local/bin`` - in linux - dir to $PATH)
 
 Credits
 ---------
