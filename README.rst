@@ -4,21 +4,13 @@ rhdndat: romhacking.net_ dat creator and update checker
 .. _romhacking.net: http://www.romhacking.net
 
 
-**rhdndat** finds triples (rom file, softpatch file, version file) on the same 
-directory and creates a clrmamepro entry on stdout or file for the result of 
-each softpatch. It can also serve as a notifier that a update is required by 
-comparing local versions to remote romhacking.net versions.
+**rhdndat** finds triples (rom file, softpatch file, version file) on the same directory and creates a clrmamepro entry on stdout or file for the result of each softpatch. It can also serve as a notifier that a update is required by comparing local versions to remote romhacking.net versions.
 
-A softpatch filename is: 'rom filename - rom extension + patch extension' or
-'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing
-hardpatched roms and revert patches).
+A softpatch filename is: 'rom filename - rom extension + patch extension' or 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing hardpatched roms and revert patches).
 
-version file is simply named 'version' and has a version number line followed 
-by a romhacking.net url line, repeated. These correspond to each hack or 
-translation on the softpatch.
+version file is simply named 'version' and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
 
-Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
-with xdelta) on path or the same directory.
+Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
 Arguments:
 ----------
@@ -52,10 +44,7 @@ optional arguments:
 Memory Requirements
 -------------------
 
-This tool uses named FIFO files to calculate checksums when it has to patch, so
-not much memory is consumed. However, for large roms like isos, you should make
-sure you're using xdelta instead of bps, because the flips tries to read the 
-whole file into memory to create or apply a patch.
+This tool uses named FIFO files to calculate checksums when it has to patch, so not much memory is consumed. However, for patches of large roms like isos, you should make sure you're using xdelta instead of bps, because flips tries to read the whole file into memory to create or apply a patch.
 
 Install
 -------
@@ -65,11 +54,12 @@ rhdndat requires python 3.5 or later.
 `The source for this project is available here
 <https://github.com/i30817/rhdndat>`_.
 
-The project can be installed on linux machines by installing pip3 and running
-`pip3 install --user rhdndat` or `pip3 install --user
-https://github.com/i30817/rhdndat/archive/master.zip` for the latest master,
-but you'll have to provide your own flips and xdelta executables in path for 
-the ips, bps and xdelta support.
+
+The project can be installed on recent linux machines with pip3 by installing rhdndat from [PyPI]_ or installing latest master from [github]_ but you'll have to provide your own flips and xdelta executables in path for the ips, bps and xdelta support. That depends on your distribution but you can get and build  them on the sites at the end of the document.
+
+
+.. [PyPI] ``pip3 install --user rhdndat``
+.. [github] ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip``
 
 Credits
 ---------
