@@ -1,4 +1,5 @@
-rhdndat: romhacking.net dat creator and update checker
+rhdndat: romhacking.net_ dat creator and update checker
+.. _romhacking.net: http://www.romhacking.net
 ==========================================================
 
 *rhdndat* finds triples (rom file, softpatch file, version file) on the same 
@@ -23,15 +24,15 @@ Arguments
 rhdndat [-h] [-o output file] [-d xml file] [-i] [-t] search-path rom-type
 
 positional arguments:
-  -search-path  directory tree to search for (rom, patches and version) files
+  -_search-path     directory tree to search for (rom, patches and version) files
                 
-                If there is no tuple but a patch of the form 
-                'rom_filename.reset.xdelta' is found, rom is assumed to be 
-                hardpatched, -d will search for the checksum of the reseted 
-                rom and the output will be the checksums of 'rom'
-
-  -rom-type     extension (without dot) of roms to find patches for
-
+                    If there is no tuple but a patch of the form 
+                    'romfilename.reset.xdelta' is found, rom is assumed to be 
+                    hardpatched, -d will search for the checksum of the reseted 
+                    rom and the output will be the checksums of 'rom'
+.. |-| replace:: 
+  -_rom-type        extension (without dot) of roms to find patches for
+.. |-| replace:: 
 optional arguments:
   -h, --help      show this help message and exit
   -o output-file  ouput file, if ommited writes to stdout
