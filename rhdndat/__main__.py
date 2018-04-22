@@ -300,7 +300,7 @@ def read_version_file(possible_metadata):
                 url = file_version.readline()
                 assert ( version and url ) or not ( version or url ), 'version files require (version, url) pairs'
                 if not url: break
-                hacks_list += [(version.strip().lower(), url.strip())]
+                hacks_list += [(version.strip(), url.strip())]
     except Exception as e:
         raise ScriptError("has version file, but no valid contents")
     if not hacks_list:
