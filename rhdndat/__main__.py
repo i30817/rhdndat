@@ -231,6 +231,8 @@ def which(executable):
     flips = shutil.which(executable)
     if not flips:
         flips = shutil.which(executable, path=os.path.dirname(__file__))
+    if not flips:
+        flips = shutil.which(executable, path=os.getcwd())
     return flips
 
 

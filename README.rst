@@ -55,7 +55,7 @@ rhdndat requires python 3.5 or later.
 <https://github.com/i30817/rhdndat>`_.
 
 
-The project can be installed on recent linux machines with pip3 by installing rhdndat from [PyPI]_ or installing latest master from [github]_ but you'll have to provide your own flips and xdelta executables in path for the ips, bps and xdelta support. That depends on your distribution but you can get and build  them on the sites at the end of the document.
+The project can be installed on recent linux machines with pip3 by installing rhdndat from [PyPI]_ or installing latest master from [github]_ but you'll have to provide your own flips and xdelta executables in path (or current dir) for the ips, bps and xdelta support. That depends on your distribution but you can get and build them on the sites at the end of the document.
 
 
 .. [PyPI] ``pip3 install --user rhdndat``
