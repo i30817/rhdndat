@@ -23,14 +23,14 @@ Arguments
 rhdndat [-h] [-o output file] [-d xml file] [-i] [-t] search-path rom-type
 
 positional arguments:
-  -s                directory tree to search for (rom, patches and version) files
+  s                directory tree to search for (rom, patches and version) files
 
                     If there is no tuple but a patch of the form 
                     'rom_filename.reset.xdelta' is found, rom is assumed to be 
                     hardpatched, -d will search for the checksum of the reseted 
                     rom and the output will be the checksums of 'rom'
                   
-  -r                extension (without dot) of roms to find patches for
+  r                extension (without dot) of roms to find patches for
 
 optional arguments:
   -h, --help      show this help message and exit
