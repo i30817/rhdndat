@@ -8,8 +8,9 @@ rhdndat: romhacking.net_ dat creator and update checker
 
 A softpatch filename is: 'rom filename - rom extension + patch extension' or 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing hardpatched roms and revert patches).
 
-version file is simply named 'version' and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch. If a version file exists but no patch, the rom is assumed to be hardpatched.
+If there is no patch file, but a version file exists, and the extension matches, the file will be assumed to be hardpatched, which can be avoided by passing -i.
 
+version file is simply named 'version' and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
@@ -21,10 +22,13 @@ Arguments:
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
                 
-                    If there is no tuple but a patch of the form 
-                    'romfilename.reset.xdelta' is found, rom is assumed to be 
-                    hardpatched, -d will search for the checksum of the reseted 
-                    rom and the output will be the checksums of 'rom'
+                    if there is no (rom, romfilename patch) pair but a patch of 
+                    the form 'romfilename.reset.xdelta' is found, rom is treated
+                    as a hardpatched rom, -d will search for the checksum of the
+                    original rom and the output will be the checksums of 'rom'
+
+                    if (rom, version) pair exists, but no patch at all, rom is
+                    treated as hardpatched and printed unless -i is given
 
   -rom-type        extension (without dot) of roms to find patches for
 
@@ -35,8 +39,9 @@ optional arguments:
                   checksum in this file, if checksum not in xml, the program 
                   picks names from hack page 
                   
-  -i              don't allow unrecognized roms to be added even if the 
-                  patches have a romhacking.net page
+  -i              don't allow unrecognized roms to be added even if the patches
+                  have a romhacking.net page, prevents (rom,version) without
+                  patch from being added as hardpatches
                   
   -t              only test version numbers against remote version, 
                   ignore -o, -d or -i, works without a patch present

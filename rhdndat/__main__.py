@@ -344,7 +344,7 @@ def get_romhacking_data(rom, possible_metadata):
 
         remote_version = info.find("th", string="Patch Version").nextSibling.string.strip()
         if remote_version and remote_version != version:
-          print("warning: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
+          print("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
     return (metadata, language)
 
 def get_dat_rom_name(dat, dat_crc32):
@@ -393,7 +393,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
 
             if not os.path.isfile(possible_metadata):
                 if patches: 
-                    print("warning: '{}' : has patches without a version file".format(rom), file=sys.stderr)
+                    print("warn: '{}' : has patches without a version file".format(rom), file=sys.stderr)
                 continue
             
             try:
@@ -406,7 +406,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                 if not patches:
                     if unknown_remove:
                         raise ScriptError("no patches and a version file, hardpatch possible, but -i given")
-                    print("warning: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom), file=sys.stderr)
+                    print("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom), file=sys.stderr)
                     softpatch = False
 
                 if len(patches) > 1:
@@ -444,7 +444,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                     if unknown_remove and not rom_title:
                         raise ScriptError("checksum not found in dat")
                     elif not rom_title:
-                        print("warning: '{}' : checksum not found on dat, but not skipped".format(rom), file=sys.stderr)
+                        print("warn: '{}' : checksum not found on dat, but not skipped".format(rom), file=sys.stderr)
 
                 hack = Hack(
                     metadata,
@@ -486,10 +486,12 @@ A softpatch filename is: 'rom filename - rom extension + patch extension' or
 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing
 hardpatched roms and revert patches).
 
+If there is no patch file, but a version file exists, and the extension matches,
+the file will be assumed to be hardpatched, which can be avoided by passing -i.
+
 version file is simply named 'version' and has a version number line followed 
 by a romhacking.net url line, repeated. These correspond to each hack or 
-translation on the softpatch. If a version file exists but no patch, the rom
-is assumed to be hardpatched.
+translation on the softpatch.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
 with xdelta) on path or the same directory.""")
@@ -499,10 +501,13 @@ with xdelta) on path or the same directory.""")
         help=textwrap.dedent("""\
 directory tree to search for (rom, patches and version) files
 
-If there is no tuple but a patch of the form 
-\'romfilename.reset.xdelta\' is found, rom is assumed to be 
-hardpatched, -d will search for the checksum of the reseted 
-rom and the output will be the checksums of \'rom\'
+if there is no (rom, romfilename patch) pair but a patch of 
+the form \'romfilename.reset.xdelta\' is found, rom is treated 
+as a hardpatched rom, -d will search for the checksum of the
+original rom and the output will be the checksums of \'rom\'
+
+if (rom, version) pair exists, but no patch at all, rom is
+treated as hardpatched and printed unless -i is given
 
             """))
     parser.add_argument('r', metavar=('rom-type'), type=str, 
@@ -518,8 +523,9 @@ picks names from hack page
     """))
     parser.add_argument('-i', action='store_true', 
 help=textwrap.dedent("""\
-don\'t allow unrecognized roms to be added even if the 
-patches have a romhacking.net page
+don\'t allow unrecognized roms to be added even if the patches
+have a romhacking.net page, prevents (rom,version) without
+patch from being added as hardpatches
 
     """))
     parser.add_argument('-t', action='store_true', 
