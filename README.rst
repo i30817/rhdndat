@@ -4,20 +4,21 @@ rhdndat: romhacking.net_ dat creator and update checker
 .. _romhacking.net: http://www.romhacking.net
 
 
-**rhdndat** finds triples (rom file, softpatch file, version file) on the same directory and creates a clrmamepro entry on stdout or file for the result of each softpatch. It can also serve as a notifier that a update is required by comparing local versions to remote romhacking.net versions.
+**rhdndat** finds triples ``(rom file, softpatch file, version file)`` on the same directory and creates a clrmamepro entry on stdout or file for the result of each softpatch. It can also serve as a notifier that a update is required by comparing local versions to remote romhacking.net versions.
 
-A softpatch filename is: ``rom filename - rom extension + patch extension`` or ``rom filename - rom extension + .reset.xdelta`` (special case for recognizing hardpatched roms and revert patches).
+A softpatch filename is:
+``rom filename - rom extension + patch extension`` or ``rom filename - rom extension + .reset.xdelta`` (special case for recognizing hardpatched roms and revert patches).
 
 If there is no patch file, but a version file exists, and the extension matches, the file will be assumed to be hardpatched, which can be avoided by passing ``-i``.
 
-version file is simply named `version` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
+version file is simply named ``version`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
 Arguments:
 ----------
 
-``**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**``
+**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
