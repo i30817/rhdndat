@@ -6,9 +6,8 @@ rhdndat: romhacking.net_ dat creator and update checker
 
 **rhdndat** finds triples ``(rom file, softpatch file, version file)`` on the same directory and creates a clrmamepro entry on stdout or file for the result of each softpatch. It can also serve as a notifier that a update is required by comparing local versions to remote romhacking.net versions.
 
-A softpatch filename is:
-
-``rom filename - rom extension + patch extension`` or ``rom filename - rom extension + .reset.xdelta`` (special case for recognizing hardpatched roms and revert patches).
+| A softpatch filename is:
+| ``rom filename - rom extension + patch extension`` or ``rom filename - rom extension + .reset.xdelta`` (special case for recognizing hardpatched roms and revert patches).
 
 If there is no patch file, but a version file exists, and the extension matches, the file will be assumed to be hardpatched, which can be avoided by passing ``-i``.
 
