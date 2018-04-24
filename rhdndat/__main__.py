@@ -506,8 +506,8 @@ the form \'romfilename.reset.xdelta\' is found, rom is treated
 as a hardpatched rom, -d will search for the checksum of the
 original rom and the output will be the checksums of \'rom\'
 
-if (rom, version) pair exists, but no patch at all, rom is
-treated as hardpatched and printed unless -i is given
+if (rom, version) pair exists, but no patch, rom is treated
+as hardpatched and printed unless -i is given
 
             """))
     parser.add_argument('r', metavar=('rom-type'), type=str, 

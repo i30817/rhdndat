@@ -31,8 +31,8 @@ positional arguments:
                     as a hardpatched rom, -d will search for the checksum of the
                     original rom and the output will be the checksums of 'rom'
 
-                    if (rom, version) pair exists, but no patch at all, rom is
-                    treated as hardpatched and printed unless -i is given
+                    if (rom, version) pair exists, but no patch, rom is treated
+                    as hardpatched and printed unless -i is given
 
   -rom-type        extension (without dot) of roms to find patches for
 
