@@ -162,7 +162,7 @@ class Hack:
                 description += " + {} hack by {} version ({})".format(title, author, version)
 
         remote_hack = '''
-game(
+game (
     name "{} {}"
     description "{}"
     rom ( name "{}" size {} crc {} md5 {} sha1 {} )
