@@ -418,11 +418,11 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                 #if using dat file for name, find the rom on dat
                 rom_title = None
                 if dat and softpatch:
+                    dat_crc32 = None
                     if skip_bytes == 0 and (patch.endswith(".bps") or patch.endswith(".BPS")):
                         #bps roms have 12 bytes footers with the source, destination and patch crc32s
                         #unfortunately, this doesn't work if the dat we're working with skips headers
                         #(except for SNES headers, which is the one header bps ignores when creating/applying a patch)
-                        dat_crc32 = None
                         target = None
                         with open(patch, 'rb') as p:
                             p.seek(-12, os.SEEK_END)
@@ -442,9 +442,9 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                              rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
                     if unknown_remove and not rom_title:
-                        raise ScriptError("checksum not found in dat")
+                        raise ScriptError("crc32 '{}' not found in dat".format(dat_crc32))
                     elif not rom_title:
-                        print("warn: '{}' : checksum not found on dat, but not skipped".format(rom), file=sys.stderr)
+                        print("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom), file=sys.stderr)
 
                 hack = Hack(
                     metadata,
@@ -468,7 +468,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                     print(hackstr, file=sys.stdout)
 
             except ScriptError as e: #let the default stop execution and print on other errors
-                print("skip: '{}' : '{}'".format(rom, e), file=sys.stderr)
+                print("skip: '{}' : {}".format(rom, e), file=sys.stderr)
                 continue
 
 import textwrap
