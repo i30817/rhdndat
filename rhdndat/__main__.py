@@ -2,14 +2,16 @@
 
 import argparse, sys, os, shutil, struct, signal, hashlib, itertools, urllib.request, subprocess, tempfile, zlib
 from itertools import product
+from rhdndat import __version__
 
-
+import importlib
 try:
-    from bs4 import BeautifulSoup
+    assert importlib.util.find_spec('bs4') is not None
+    assert importlib.util.find_spec('lxml') is not None
+    assert importlib.util.find_spec('pyparsing') is not None
 except Exception as e:
-    print("Please install beautifulsoup. You can install the most recent version with 'pip3 install --user beautifulsoup4'", file=sys.stderr)
+    print("Please install required libraries. You can install the most recent version with:\n\tpip3 install --user beautifulsoup4 lxml pyparsing", file=sys.stderr)
     sys.exit(1)
-
 
 languages = [
     ('aa', 'Afar'), ('ab', 'Abkhazian'), ('af', 'Afrikaans'), ('ak', 'Akan'),
@@ -170,6 +172,70 @@ game (
 )'''.format(main_title, title_suffix, description, rom, size, crc, md5, sha1, comments)
         return remote_hack
 
+from pyparsing import *
+from urllib.parse import urlparse
+def hack_entry():
+    """clrmamepro ra hacks entries parser. Keeps a string representation and a url list"""
+
+    quotes = quotedString()
+    quotes.setParseAction(removeQuotes)
+    size = Word(nums)
+    crc = Word(hexnums, exact=8)
+    md5 = Word(alphanums, exact=32)
+    sha1 = Word(alphanums, exact=40)
+
+    rom_data   =    Suppress(Keyword("name")) + quotes.copy().setResultsName("filename") + \
+                    Suppress(Keyword("size")) + size.setResultsName("size")       + \
+                    Suppress(Keyword("crc"))  + crc.setResultsName("crc")         + \
+                    Suppress(Keyword("md5"))  + md5.setResultsName("md5")         + \
+                    Suppress(Keyword("sha1")) + sha1.setResultsName("sha1")
+
+    def process_hack(token):
+        romhack ='''
+game (
+    name "{}"
+    description "{}"
+    rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
+)'''
+        urls = []
+        comments = ""
+        for com in token.comments:
+            comments += "\n    comment \"{}\"".format(com)
+            try:
+                url = urlparse(com)
+                if url.netloc and url.netloc in "www.romhacking.net":
+                    urls.append(url.path)
+            except ValueError as e: 
+                continue
+
+        to_string = romhack.format(token.name, token.description, 
+            token.filename, token.size, token.crc, token.md5, token.sha1, comments)
+
+        return {'string': to_string, 'urls': urls}
+
+    comments = ZeroOrMore(Suppress(Keyword("comment")) + quotes.copy())
+
+    a= Suppress(Keyword("name"))        + quotes.copy().setResultsName("name")  + \
+       Suppress(Keyword("description")) + quotes.copy().setResultsName("description") + \
+       Suppress(Keyword("rom"))                   + \
+       Suppress(Keyword("("))                     + \
+       rom_data                                   + \
+       Suppress(Keyword(")"))                     + \
+       comments.setResultsName("comments")
+    a.setParseAction(process_hack)
+
+    output = Suppress(Keyword("game")) + Suppress(Keyword("(")) + a + Suppress(Keyword(")"))
+    return output
+
+def hack_dat(file):
+    """clrmamepro ra hacks dat files parser. First element is already text"""
+    quotes = quotedString()
+    dat_data   = Keyword("name") + quotes + Keyword("description") + quotes
+    dat_header = Keyword("clrmamepro") + nestedExpr(content=dat_data)
+
+    mamepro = originalTextFor(Optional(dat_header)) + ZeroOrMore(hack_entry())
+    return mamepro.parseFile(file, parseAll=True)
+
 from contextlib import contextmanager
 @contextmanager
 def named_pipes(n=1):
@@ -235,35 +301,18 @@ def which(executable):
         flips = shutil.which(executable, path=os.getcwd())
     return flips
 
-
-def flips_producer(flips, patch, source, generator_function):
+def producer(arguments, generator_function):
+    """ will append a output fifo to the end of the argument list prior to 
+        applying the generator function to that fifo. Make sure the command 
+        output is setup for the last argument to be a output file in the arguments
+    """
     BLOCKSIZE = 2 ** 20
     process = None
     next(generator_function)
     with named_pipes() as pipes:
         pipe = pipes[0]
-        with subprocess.Popen([flips, "--exact", "-a", patch, source, pipe ], 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL) as process:
-            with open(pipe, 'rb') as fifo:
-                bytes = fifo.read(BLOCKSIZE)
-                while len(bytes) > 0:
-                    generator_function.send(bytes)
-                    bytes = fifo.read(BLOCKSIZE)
-    
-    #if a error occurred avoid writing bogus checksums
-    if process.returncode != 0:
-        raise ScriptError("error during patching, try to remove the header if a snes rom")
-
-    return generator_function.send([])
-
-def xdelta_producer(xdelta, patch, source, generator_function):
-    BLOCKSIZE = 2 ** 20
-    process = None
-    next(generator_function)
-    with named_pipes() as pipes:
-        pipe = pipes[0]
-        with subprocess.Popen([xdelta, "-d", "-s", source, patch, pipe ], 
+        arguments.append(pipe)
+        with subprocess.Popen(arguments, 
                 stdout=subprocess.DEVNULL, 
                 stderr=subprocess.DEVNULL) as process:
             with open(pipe, 'rb') as fifo:
@@ -283,12 +332,12 @@ def patch_producer(patch, source, generator_function):
         xdelta = which("xdelta3")
         if not xdelta:
             raise ScriptError("xdelta3 not found")
-        return xdelta_producer(xdelta, patch, source, generator_function)
+        return producer([xdelta, "-d", "-s",  source, patch], generator_function)
     else:
         flips = which("flips")
         if not flips:
             raise ScriptError("flips not found")
-        return flips_producer(flips, patch, source, generator_function)
+        return producer([flips, "--exact", "-a", patch, source], generator_function)
 
 #version files contain sequences of two lines: a version number and a romhacking url    
 def read_version_file(possible_metadata):
@@ -353,7 +402,37 @@ def get_dat_rom_name(dat, dat_crc32):
         return dat_rom.parent['name']
     return None
 
-def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_versions_only):
+def write_to_file(file, hacks, merge_dat):
+    if merge_dat:
+        #print the header, already turned to text on the grammar
+        #may not exist and thus be a empty string
+        header = merge_dat.pop(0)
+        file.write( header )
+
+        #this filters out of the old dat newly verified files
+        #the only thing that can reliably identify a duplicate is the hack urls
+        #because everything else can change (technically the hack url can not
+        #change and the romhack change version but in that case were want the last)
+        for sourced_hack in hacks:
+            #pyparsing introduces a extra list for some reason
+            hack = hack_entry().parseString(sourced_hack)[0]
+            urls = hack['urls']
+            if urls: #empty lists don't count
+                for i, old_hack in enumerate(merge_dat): 
+                    if old_hack['urls'] == urls:
+                        del merge_dat[i]
+                        break #prevents iterator invalidation
+
+        #non-automated hacks go first...
+        for unsourced_hack in merge_dat:
+            st = hack['string']
+            file.write( st )      
+    #automated hacks go last
+    for sourced_hack in hacks:
+        file.write( sourced_hack )
+
+from bs4 import BeautifulSoup
+def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
     skip_bytes = 0
     dat = None
     if dat_file:
@@ -374,7 +453,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
     #this is probably over-zealous and slow but whatever
     romtypes   = list(Cc("."+romtype))
 
-
+    hacks = []
     for dirpath, _, files in os.walk(searchdir):
         for rom in files:
             
@@ -401,7 +480,7 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                 
                 if test_versions_only:
                     continue
-                
+
                 softpatch = True
                 if not patches:
                     if unknown_remove:
@@ -451,7 +530,6 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                     language,
                     rom_title
                 )
-                
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 checksums_generator = get_checksums()
                 #hardpatch
@@ -459,23 +537,28 @@ def make_dat(searchdir, romtype, output_file, dat_file, unknown_remove, test_ver
                     (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
                 else:
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
-
-                hackstr = hack.to_string(rom, size, crc, md5, sha1)
-
-                if output_file:
-                    output_file.write( hackstr )
-                else:
-                    print(hackstr, file=sys.stdout)
-
+                #we don't process this now for merge-dat to work
+                hacks.append(hack.to_string(rom, size, crc, md5, sha1))
             except ScriptError as e: #let the default stop execution and print on other errors
                 print("skip: '{}' : {}".format(rom, e), file=sys.stderr)
                 continue
+    if output_file:
+        try:
+            with tempfile.mkstemp() as tmp_file:
+                write_to_file(tmp_file, hacks, merge_dat)
+            #tmp_file is closed, but not deleted because it's the mkstemp function
+            shutil.move(tmp_file, output_file)
+        except (IOError, OSError) as e:
+            os.remove(tmp_file)
+            raise e
+    else:
+        write_to_file(sys.stdout, hacks, merge_dat)
 
 import textwrap
 def main():
     parser = argparse.ArgumentParser(
 description =textwrap.dedent("""
-rhdndat: www.romhacking.net dat creator 
+rhdndat {} : www.romhacking.net dat creator 
 
 Finds triples (rom file, softpatch file, version file) on the same 
 directory and creates a clrmamepro entry on stdout or file for the result of 
@@ -494,7 +577,7 @@ by a romhacking.net url line, repeated. These correspond to each hack or
 translation on the softpatch.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
-with xdelta) on path or the same directory.""")
+with xdelta) on path or the same directory.""".format(__version__))
 , formatter_class=argparse.RawTextHelpFormatter
 )
     parser.add_argument('p', metavar=('search-path'), type=str, 
@@ -513,7 +596,14 @@ as hardpatched and printed unless -i is given
     parser.add_argument('r', metavar=('rom-type'), type=str, 
 help='extension (without dot) of roms to find patches for')
     parser.add_argument('-o', metavar=('output-file'), default=None, 
-type=argparse.FileType('w'), help='ouput file, if ommited writes to stdout')
+type=argparse.FileType('w'), help='output file, if ommited writes to stdout')
+    parser.add_argument('-m', metavar=('merge-file'), default=None, 
+type=argparse.FileType('r'), help=textwrap.dedent("""\
+merge non-overriden entries from this source file
+to override a entry, a new entry must list the same
+romhacking urls as the older entry
+
+            """))
     parser.add_argument('-d', metavar=('xml-file'), type=argparse.FileType('r'), 
 help=textwrap.dedent("""\
 forces to pick up the translations game names from the rom 
@@ -531,10 +621,9 @@ patch from being added as hardpatches
     parser.add_argument('-t', action='store_true', 
 help=textwrap.dedent("""\
 only test version numbers against remote version, 
-ignore -o, -d or -i, works without a patch present
+ignore -o, -m, -d or -i, works without a patch present
     """))
     args = parser.parse_args()
-    
 
     signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work  
 
@@ -544,9 +633,16 @@ ignore -o, -d or -i, works without a patch present
     else:
         if args.t:
             args.o = None
+            args.m = None
             args.d = None
             args.i = False
-        make_dat(args.p, args.r, args.o, args.d, args.i, args.t)
+
+        try:
+            dat = None if not args.m else hack_dat(args.m)
+            make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
+        except ParseException as e: 
+            print("error: parsing clrmamepro merge dat : {}".format(e), file=sys.stderr)
+            return 1
     return 0
 
 

@@ -21,7 +21,7 @@ Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work 
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -39,6 +39,10 @@ positional arguments:
 optional arguments:
   -h, --help      show this help message and exit
   -o output-file  ouput file, if ommited writes to stdout
+  -m merge-file   merge non-overriden entries from this source file
+                  to override a entry, a new entry must list the same
+                  romhacking urls as the older entry
+
   -d xml-file     forces to pick up the translations game names from the rom 
                   checksum in this file, if checksum not in xml, the program 
                   picks names from hack page 
