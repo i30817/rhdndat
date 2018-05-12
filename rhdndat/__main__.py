@@ -518,7 +518,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     if unknown_remove and not rom_title:
                         raise ScriptError("crc32 '{}' not found in dat".format(dat_crc32))
                     elif not rom_title:
-                        print("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom), file=sys.stderr)
+                        print("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32), file=sys.stderr)
 
                 hack = Hack(
                     metadata,
