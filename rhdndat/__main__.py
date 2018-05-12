@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
-import argparse, sys, os, shutil, struct, signal, hashlib, itertools, urllib.request, subprocess, tempfile, zlib
+import argparse, sys, os, shutil, struct, signal, hashlib, itertools
+import urllib.request, subprocess, tempfile, zlib
+from tempfile import NamedTemporaryFile
 from itertools import product
 from rhdndat import __version__
 
@@ -441,14 +443,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
         if dat.find("clrmamepro", header="No-Intro_NES.xml"):
             skip_bytes = 16
 
-    flips = which("flips")
-    xdelta = which("xdelta3")
-    patchtypes = []
-    if flips:
-        patchtypes += [".bps", ".BPS", ".ips", ".IPS"]
-    if xdelta:
-        patchtypes += [".xdelta", ".XDELTA", ".reset.xdelta"]
-    assert patchtypes, 'the program needs xdelta3, flips or both on the path or script dir'
+    patchtypes = [".bps", ".BPS", ".ips", ".IPS", ".xdelta", ".XDELTA", ".reset.xdelta"]
 
     #this is probably over-zealous and slow but whatever
     romtypes   = list(Cc("."+romtype))
@@ -542,20 +537,23 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
             except ScriptError as e: #let the default stop execution and print on other errors
                 print("skip: '{}' : {}".format(rom, e), file=sys.stderr)
                 continue
+
     if output_file:
-        try:
-            with tempfile.mkstemp() as tmp_file:
-                write_to_file(tmp_file, hacks, merge_dat)
-            #tmp_file is closed, but not deleted because it's the mkstemp function
-            shutil.move(tmp_file, output_file)
-        except (IOError, OSError) as e:
-            os.remove(tmp_file)
-            raise e
+        #dont add a try-except, it's not clear how to capture tmp_file to delete it on error
+        with NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8') as tmp_file:
+            write_to_file(tmp_file, hacks, merge_dat)
+
+        shutil.move(tmp_file.name, output_file.name)
     else:
         write_to_file(sys.stdout, hacks, merge_dat)
 
 import textwrap
 def main():
+    flips = which("flips")
+    xdelta = which("xdelta3")
+    if not (flips and xdelta):
+        print("error: rhdndat needs xdelta3 and flips on the path or script dir", file=sys.stderr)
+        return 1
     parser = argparse.ArgumentParser(
 description =textwrap.dedent("""
 rhdndat {} : www.romhacking.net dat creator 
@@ -595,17 +593,21 @@ as hardpatched and printed unless -i is given
             """))
     parser.add_argument('r', metavar=('rom-type'), type=str, 
 help='extension (without dot) of roms to find patches for')
+#we want to write to this file (more like overwrite), however, we don't
+#want to clobber it from the start, in case we're reading from it first.
+#open in 'r+' mode (ie: read-write, doesn't truncate automatically).
+#We don't need to truncate because we're using a tmp file and moving it the this
     parser.add_argument('-o', metavar=('output-file'), default=None, 
-type=argparse.FileType('w'), help='output file, if ommited writes to stdout')
+type=argparse.FileType('r+', encoding='utf-8'), help='output file, if ommited writes to stdout')
     parser.add_argument('-m', metavar=('merge-file'), default=None, 
-type=argparse.FileType('r'), help=textwrap.dedent("""\
+type=argparse.FileType('r', encoding='utf-8'), help=textwrap.dedent("""\
 merge non-overriden entries from this source file
 to override a entry, a new entry must list the same
 romhacking urls as the older entry
 
             """))
-    parser.add_argument('-d', metavar=('xml-file'), type=argparse.FileType('r'), 
-help=textwrap.dedent("""\
+    parser.add_argument('-d', metavar=('xml-file'),
+type=argparse.FileType('r', encoding='utf-8'), help=textwrap.dedent("""\
 forces to pick up the translations game names from the rom 
 checksum in this file, if checksum not in xml, the program 
 picks names from hack page 
@@ -625,7 +627,7 @@ ignore -o, -m, -d or -i, works without a patch present
     """))
     args = parser.parse_args()
 
-    signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work  
+    signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
 
     if "." in args.r or not os.path.isdir(args.p):
         parser.print_help()
@@ -636,7 +638,6 @@ ignore -o, -m, -d or -i, works without a patch present
             args.m = None
             args.d = None
             args.i = False
-
         try:
             dat = None if not args.m else hack_dat(args.m)
             make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
