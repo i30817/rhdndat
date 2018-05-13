@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 
-import argparse, sys, os, shutil, struct, signal, hashlib, itertools
+import argparse, sys, os, shutil, struct, signal, hashlib, itertools, textwrap
 import urllib.request, subprocess, tempfile, zlib
+from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
 from itertools import product
+from contextlib import contextmanager
+from difflib import ndiff
 from rhdndat import __version__
 
 import importlib
@@ -11,9 +14,15 @@ try:
     assert importlib.util.find_spec('bs4') is not None
     assert importlib.util.find_spec('lxml') is not None
     assert importlib.util.find_spec('pyparsing') is not None
+    assert importlib.util.find_spec('colorama') is not None
 except Exception as e:
-    print("Please install required libraries. You can install the most recent version with:\n\tpip3 install --user beautifulsoup4 lxml pyparsing", file=sys.stderr)
+    print("Please install required libraries. You can install the most recent version with:\n\tpip3 install --user beautifulsoup4 lxml pyparsing colorama", file=sys.stderr)
     sys.exit(1)
+
+from bs4 import BeautifulSoup
+from pyparsing import *
+from colorama import Fore, Back, Style, init
+init()
 
 languages = [
     ('aa', 'Afar'), ('ab', 'Abkhazian'), ('af', 'Afrikaans'), ('ak', 'Akan'),
@@ -92,23 +101,68 @@ class ScriptError(Exception):
         super().__init__(message)
         self.errors = errors
 
+class InternetFatalError(Exception):
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+
 class Hack:
 
-    def __init__(self, metadata_tuples, language, rom_title):
-        self.metadata_tuples = metadata_tuples
-        self.language   = language and language.string #hacks have no language
-        self.regioncode = language and getRegionCode(language)
-        self.rom_title = rom_title
+    def __init__(self, metadata_tuples, language, rom_title, rom, size, crc, md5, sha1):
+        self._metadata_tuples = metadata_tuples
+        self._language   = language and language.string #hacks have no language
+        self._regioncode = language and getRegionCode(language)
+        self._rom_title = rom_title
+        self._rom = rom
+        self._size = size
+        self._crc = crc
+        self._md5 = md5
+        self._sha1 = sha1
+        self._string = None
 
-    def to_string(self, rom, size, crc, md5, sha1):
-        #main name priority:
-        # first hack with zero translations > rom_title > last translation > first hack
-        # secondary name be:
-        # [(last)T-lang by author] for 1+ T and 0 hacks (translations are only multiple if addendums)
-        # [(last)T-lang by author + # Hacks] for 1+ T and 1+ hacks + 
-        # [(first) Hack by author] for 0 T and 1 hack
-        # [(first) Hack by author + # hacks] for 0 T and 1+ hack
-        # (# is always equal to (number of translations + number of hacks -1) when it appears
+    @staticmethod
+    def is_rhdn_translation(url_str):
+        return "www.romhacking.net/translations" in url_str
+
+    @staticmethod
+    def is_rhdn_hack(url_str):
+        return "www.romhacking.net/hacks" in url_str
+
+    @staticmethod
+    def get_rhdn_path(url_str):
+        try:
+            url = urlparse(url_str)
+            if url.netloc and url.netloc in "www.romhacking.net":
+                return url.path
+        except ValueError as e: 
+            return None
+
+    @property
+    def rhdn_paths(self):
+        #urls here are guaranteed to come from romhacking.net. This still may throw
+        #if the url is malformed, in a way that urlparse can't deal with, but it
+        #should have errored earlier then
+        urls = [ urlparse(url).path for (_, _, _, url) in self._metadata_tuples ]
+        assert urls
+        return urls
+
+    @property
+    def string(self):
+        '''
+        main name priority:
+          first hack with zero translations > rom_title > last translation > first hack
+          secondary name be:
+          [(last)T-lang by author] for 1+ T and 0 hacks (translations are only multiple if addendums)
+          [(last)T-lang by author + # Hacks] for 1+ T and 1+ hacks + 
+          [(first) Hack by author] for 0 T and 1 hack
+          [(first) Hack by author + # hacks] for 0 T and 1+ hack
+          (# is always equal to (number of translations + number of hacks -1) when it appears
+        '''
+
+        if self._string:
+            return self._string
+
 
         last_translation = None
         last_translation_author = None
@@ -117,12 +171,12 @@ class Hack:
         count_translations = 0
         count_hacks = 0
 
-        for title, author, version, url in self.metadata_tuples:
-            if "www.romhacking.net/translations" in url:
+        for title, author, version, url in self._metadata_tuples:
+            if Hack.is_rhdn_translation(url):
                 count_translations = count_translations + 1
                 last_translation = title
                 last_translation_author = author
-            elif  "www.romhacking.net/hacks" in url:
+            elif Hack.is_rhdn_hack(url):
                 count_hacks = count_hacks + 1
                 if not first_hack:
                     first_hack = title
@@ -130,7 +184,7 @@ class Hack:
             else:
                 assert False
 
-        main_title = self.rom_title
+        main_title = self._rom_title
         if count_hacks > 0 and count_translations == 0:
             main_title = first_hack
         if not main_title:
@@ -142,9 +196,9 @@ class Hack:
 
         cardinal_of_hacks = (count_hacks + count_translations - 1)
         if count_translations > 0 and count_hacks == 0:
-            title_suffix = "[T-{} by {}]".format(self.regioncode, last_translation_author)
+            title_suffix = "[T-{} by {}]".format(self._regioncode, last_translation_author)
         elif count_translations > 0 and count_hacks > 0:
-            title_suffix = "[T-{} by {} + {} hacks]".format(self.regioncode, last_translation_author, cardinal_of_hacks)
+            title_suffix = "[T-{} by {} + {} hacks]".format(self._regioncode, last_translation_author, cardinal_of_hacks)
         elif count_translations == 0 and count_hacks == 1:
             title_suffix = "[Hack by {}]".format(first_hack_author)
         elif count_translations == 0 and count_hacks > 0:
@@ -152,37 +206,65 @@ class Hack:
         else:
             assert False
 
-        (title, author, version, url) = self.metadata_tuples[0]
+        (title, author, version, url) = self._metadata_tuples[0]
         comments = "    comment \"{}\"".format(url)
-        if "www.romhacking.net/translations" in url:
-            description = "{} translation by {} version ({})".format(self.language, author, version)
+        if Hack.is_rhdn_translation(url):
+            description = "{} translation by {} version ({})".format(self._language, author, version)
         else:
             description = "{} hack by {} version ({})".format(title, author, version)
-        for title, author, version, url in self.metadata_tuples[1:]:
+        for title, author, version, url in self._metadata_tuples[1:]:
             comments += "\n    comment \"{}\"".format(url)
-            if "www.romhacking.net/translations" in url:
-                description += " + {} translation by {} version ({})".format(self.language, author, version)
+            if Hack.is_rhdn_translation(url):
+                description += " + {} translation by {} version ({})".format(self._language, author, version)
             else:
                 description += " + {} hack by {} version ({})".format(title, author, version)
 
-        remote_hack = '''
+        self._string = '''
 game (
     name "{} {}"
     description "{}"
     rom ( name "{}" size {} crc {} md5 {} sha1 {} )
 {}
-)'''.format(main_title, title_suffix, description, rom, size, crc, md5, sha1, comments)
-        return remote_hack
+)'''.format(main_title, title_suffix, description, self._rom, self._size, self._crc, self._md5, self._sha1, comments)
+        return self._string
 
-from pyparsing import *
-from urllib.parse import urlparse
+def process_hack(token):
+    romhack ='''
+game (
+    name "{}"
+    description "{}"
+    rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
+)'''
+    urls = []
+    comments = ""
+    #possible to have no comments
+    for com in token.comments:
+        comments += "\n    comment \"{}\"".format(com)
+        loc = Hack.get_rhdn_path(com)
+        if loc:
+            urls.append(loc)
+
+    #rom is nested because it's a nestedExpr
+    rom = token.rom[0]
+
+    #crc is nested because of action
+    to_string = romhack.format(token.name, token.description, 
+        rom.filename, rom.size, rom.crc, rom.md5, rom.sha1, comments)
+
+    return {'string': to_string, 'rhdn_paths': urls}
+
 def hack_entry():
     """clrmamepro ra hacks entries parser. Keeps a string representation and a url list"""
+    #pyparsing word tokens always insert a list around the given action argument
+    #and insert a new list in the return. Don't deepen it!
+    def always_leading_zero_in_crc(token):
+        return token[0].zfill(8)
 
     quotes = quotedString()
     quotes.setParseAction(removeQuotes)
     size = Word(nums)
-    crc = Word(hexnums, exact=8)
+    #max and the action is to be permissive, even if no-intro isn't
+    crc = Word(hexnums, max=8).setParseAction(always_leading_zero_in_crc)
     md5 = Word(alphanums, exact=32)
     sha1 = Word(alphanums, exact=40)
 
@@ -192,41 +274,16 @@ def hack_entry():
                     Suppress(Keyword("md5"))  + md5.setResultsName("md5")         + \
                     Suppress(Keyword("sha1")) + sha1.setResultsName("sha1")
 
-    def process_hack(token):
-        romhack ='''
-game (
-    name "{}"
-    description "{}"
-    rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
-)'''
-        urls = []
-        comments = ""
-        for com in token.comments:
-            comments += "\n    comment \"{}\"".format(com)
-            try:
-                url = urlparse(com)
-                if url.netloc and url.netloc in "www.romhacking.net":
-                    urls.append(url.path)
-            except ValueError as e: 
-                continue
-
-        to_string = romhack.format(token.name, token.description, 
-            token.filename, token.size, token.crc, token.md5, token.sha1, comments)
-
-        return {'string': to_string, 'urls': urls}
-
     comments = ZeroOrMore(Suppress(Keyword("comment")) + quotes.copy())
 
-    a= Suppress(Keyword("name"))        + quotes.copy().setResultsName("name")  + \
+    a= Suppress(Keyword("name"))        + quotes.copy().setResultsName("name")        + \
        Suppress(Keyword("description")) + quotes.copy().setResultsName("description") + \
-       Suppress(Keyword("rom"))                   + \
-       Suppress(Keyword("("))                     + \
-       rom_data                                   + \
-       Suppress(Keyword(")"))                     + \
+       Suppress(Keyword("rom"))                                                       + \
+       nestedExpr(content=rom_data).setResultsName("rom")                      + \
        comments.setResultsName("comments")
     a.setParseAction(process_hack)
 
-    output = Suppress(Keyword("game")) + Suppress(Keyword("(")) + a + Suppress(Keyword(")"))
+    output = Suppress(Keyword("game")) + nestedExpr(content=a)
     return output
 
 def hack_dat(file):
@@ -234,11 +291,10 @@ def hack_dat(file):
     quotes = quotedString()
     dat_data   = Keyword("name") + quotes + Keyword("description") + quotes
     dat_header = Keyword("clrmamepro") + nestedExpr(content=dat_data)
-
+    #keep header as text, it's easier than remaking it
     mamepro = originalTextFor(Optional(dat_header)) + ZeroOrMore(hack_entry())
     return mamepro.parseFile(file, parseAll=True)
 
-from contextlib import contextmanager
 @contextmanager
 def named_pipes(n=1):
     dirname = tempfile.mkdtemp()
@@ -357,52 +413,79 @@ def read_version_file(possible_metadata):
     if not hacks_list:
         raise ScriptError("has version file, but no valid contents")
     for version, url in hacks_list:
-        if not ("www.romhacking.net/translations" in url or "www.romhacking.net/hacks" in url):
+        if not (Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url) ):
             raise ScriptError("has non romhacking urls in version file")
     return hacks_list
 
 def get_romhacking_data(rom, possible_metadata):
     metadata = []
     language = None
-    for (version, url) in read_version_file(possible_metadata):
-        page = urllib.request.urlopen(url).read()
-        soup = BeautifulSoup(page, "lxml")
-        info = soup.find("table", class_="entryinfo entryinfosmall").find("tbody")
+    try:
+        for (version, url) in read_version_file(possible_metadata):
+            page = urllib.request.urlopen(url).read()
+            soup = BeautifulSoup(page, "lxml")
+            info = soup.find("table", class_="entryinfo entryinfosmall").find("tbody")
 
-        #hacks have no language
-        tmp  = info.find("th", string="Language")
-        tmp  = tmp and tmp.nextSibling.string
-        #it's a error for a translation to have 1+ languages, whatever combination of patches there is
-        if not language:
-            language = tmp
-        assert ( tmp == None or tmp == language ), 'language of a translation should never change with a addendum'
+            #hacks have no language
+            tmp  = info.find("th", string="Language")
+            tmp  = tmp and tmp.nextSibling.string
+            #it's a error for a translation to have 1+ languages, whatever combination of patches there is
+            if not language:
+                language = tmp
+            assert ( tmp == None or tmp == language ), 'language of a translation should never change with a addendum'
 
-        authors = info.find("th", string="Released By").nextSibling
-        authors_str = authors.string
-        if not authors_str:
-            authors = authors.findAll("a")
-            authors_str = authors[0].string
-            for author in authors[1:-1]:
-                authors_str += ", {}".format(author.string)
-            authors_str += " and {}".format(authors[-1].string)
+            authors = info.find("th", string="Released By").nextSibling
+            authors_str = authors.string
+            if not authors_str:
+                authors = authors.findAll("a")
+                authors_str = authors[0].string
+                for author in authors[1:-1]:
+                    authors_str += ", {}".format(author.string)
+                authors_str += " and {}".format(authors[-1].string)
 
-        metadata += [(
-            info.find("div").find("div").string, #main title
-            authors_str,
-            version, #the version we actually have
-            url
-        )]
+            metadata += [(
+                info.find("div").find("div").string, #main title
+                authors_str,
+                version, #the version we actually have
+                url
+            )]
 
-        remote_version = info.find("th", string="Patch Version").nextSibling.string.strip()
-        if remote_version and remote_version != version:
-          print("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
-    return (metadata, language)
+            remote_version = info.find("th", string="Patch Version").nextSibling.string.strip()
+            if remote_version and remote_version != version:
+              print("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
+        return (metadata, language)
+    except Exception as e:
+        raise InternetFatalError("rhdndata requires a active internet connection", e)
 
 def get_dat_rom_name(dat, dat_crc32):
     dat_rom = dat.find("rom", crc=dat_crc32)
     if dat_rom:
         return dat_rom.parent['name']
     return None
+
+def line_by_line_diff(a, b):
+    import difflib
+    def process_tag(tag, i1, i2, j1, j2):
+        if tag == 'replace':
+            return Fore.BLUE + matcher.b[j1:j2] + Fore.RESET
+        if tag == 'delete':
+            return Fore.RED + matcher.a[i1:i2] + Fore.RESET
+        if tag == 'equal':
+            return matcher.a[i1:i2]
+        if tag == 'insert':
+            return Fore.GREEN + matcher.b[j1:j2] + Fore.RESET
+        assert false, "Unknown tag %r"%tag
+
+    lines_a = a.splitlines()
+    lines_b = b.splitlines()
+    out = ''
+    marker = ''
+    for (a, b) in itertools.zip_longest(lines_a, lines_b, fillvalue=""):
+        matcher = difflib.SequenceMatcher(None, a, b)
+        out += marker + ''.join(process_tag(*t) for t in matcher.get_opcodes())
+        marker = '\n'
+    return out
+
 
 def write_to_file(file, hacks, merge_dat):
     if merge_dat:
@@ -413,27 +496,29 @@ def write_to_file(file, hacks, merge_dat):
 
         #this filters out of the old dat newly verified files
         #the only thing that can reliably identify a duplicate is the hack urls
-        #because everything else can change (technically the hack url can not
-        #change and the romhack change version but in that case were want the last)
         for sourced_hack in hacks:
-            #pyparsing introduces a extra list for some reason
-            hack = hack_entry().parseString(sourced_hack)[0]
-            urls = hack['urls']
-            if urls: #empty lists don't count
-                for i, old_hack in enumerate(merge_dat): 
-                    if old_hack['urls'] == urls:
-                        del merge_dat[i]
-                        break #prevents iterator invalidation
+            #i don't know why the extra depth is being introduced except that
+            #the nextedExpressions are doing it somehow
+            for i, old_hack in reversed(list(enumerate(merge_dat))):#iterate backwards
+                old_string = old_hack[0]['string']
+                old_paths  = old_hack[0]['rhdn_paths']
+                if old_paths == sourced_hack.rhdn_paths:
+                    if old_string != sourced_hack.string:
+                        #diff works better line by line for humans
+                        diff = line_by_line_diff(old_string, sourced_hack.string)
+                        print("warn: merge-dat hack overriden by:{}".format(diff), file=sys.stderr)
+
+                    del merge_dat[i]
 
         #non-automated hacks go first...
         for unsourced_hack in merge_dat:
-            st = hack['string']
+            st = unsourced_hack[0]['string']
             file.write( st )      
     #automated hacks go last
     for sourced_hack in hacks:
-        file.write( sourced_hack )
+        file.write( sourced_hack.string )
 
-from bs4 import BeautifulSoup
+
 def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
     skip_bytes = 0
     dat = None
@@ -451,17 +536,17 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
     hacks = []
     for dirpath, _, files in os.walk(searchdir):
         for rom in files:
-            
+
             (root, ext) = os.path.splitext(rom)
             if ext not in romtypes:
                 continue
-            
+
             absolute_rom  = os.path.join(dirpath,rom)
             absolute_root = os.path.join(dirpath,root)
             def rooted(x):
                 return absolute_root+x
             possible_patches = map(rooted, patchtypes)
-            
+
             patches = [ x for x in possible_patches if os.path.isfile(x) ]
             possible_metadata = os.path.join(dirpath,'version')
 
@@ -469,10 +554,10 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if patches: 
                     print("warn: '{}' : has patches without a version file".format(rom), file=sys.stderr)
                 continue
-            
+
             try:
                 (metadata, language) = get_romhacking_data(rom, possible_metadata)
-                
+
                 if test_versions_only:
                     continue
 
@@ -500,8 +585,8 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         target = None
                         with open(patch, 'rb') as p:
                             p.seek(-12, os.SEEK_END)
-                            dat_crc32 = "{:08x}".format( struct.unpack('I', p.read(4))[0]   )
-                        
+                            dat_crc32 = "{:08x}".format( struct.unpack('I', p.read(4))[0] )
+
                         rom_title = get_dat_rom_name(dat, dat_crc32.upper())
                         if not rom_title:
                              rom_title = get_dat_rom_name(dat, dat_crc32.lower())
@@ -520,11 +605,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     elif not rom_title:
                         print("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32), file=sys.stderr)
 
-                hack = Hack(
-                    metadata,
-                    language,
-                    rom_title
-                )
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 checksums_generator = get_checksums()
                 #hardpatch
@@ -533,7 +613,8 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 else:
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
                 #we don't process this now for merge-dat to work
-                hacks.append(hack.to_string(rom, size, crc, md5, sha1))
+                hack = Hack(metadata,language,rom_title,rom,size,crc,md5,sha1)
+                hacks.append(hack)
             except ScriptError as e: #let the default stop execution and print on other errors
                 print("skip: '{}' : {}".format(rom, e), file=sys.stderr)
                 continue
@@ -547,13 +628,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
     else:
         write_to_file(sys.stdout, hacks, merge_dat)
 
-import textwrap
-def main():
-    flips = which("flips")
-    xdelta = which("xdelta3")
-    if not (flips and xdelta):
-        print("error: rhdndat needs xdelta3 and flips on the path or script dir", file=sys.stderr)
-        return 1
+def parse_args():
     parser = argparse.ArgumentParser(
 description =textwrap.dedent("""
 rhdndat {} : www.romhacking.net dat creator 
@@ -593,10 +668,7 @@ as hardpatched and printed unless -i is given
             """))
     parser.add_argument('r', metavar=('rom-type'), type=str, 
 help='extension (without dot) of roms to find patches for')
-#we want to write to this file (more like overwrite), however, we don't
-#want to clobber it from the start, in case we're reading from it first.
-#open in 'r+' mode (ie: read-write, doesn't truncate automatically).
-#We don't need to truncate because we're using a tmp file and moving it the this
+#dont clobber file because we may read from it in -m. move tmpfile over it later
     parser.add_argument('-o', metavar=('output-file'), default=None, 
 type=argparse.FileType('r+', encoding='utf-8'), help='output file, if ommited writes to stdout')
     parser.add_argument('-m', metavar=('merge-file'), default=None, 
@@ -625,9 +697,19 @@ help=textwrap.dedent("""\
 only test version numbers against remote version, 
 ignore -o, -m, -d or -i, works without a patch present
     """))
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main():
+    flips = which("flips")
+    xdelta = which("xdelta3")
+    if not (flips and xdelta):
+        print("error: rhdndat needs xdelta3 and flips on the path or script dir", file=sys.stderr)
+        return 1
 
     signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
+
+    args = parse_args()
 
     if "." in args.r or not os.path.isdir(args.p):
         parser.print_help()
@@ -641,11 +723,13 @@ ignore -o, -m, -d or -i, works without a patch present
         try:
             dat = None if not args.m else hack_dat(args.m)
             make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
-        except ParseException as e: 
-            print("error: parsing clrmamepro merge dat : {}".format(e), file=sys.stderr)
+        except ParseException as e: #fail early for parsing this to prevent data loss
+            print("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e), file=sys.stderr)
+            return 1
+        except InternetFatalError as e:
+            print("error: {}".format(e), file=sys.stderr)
             return 1
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
