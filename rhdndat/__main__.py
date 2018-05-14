@@ -47,7 +47,6 @@ class Hack():
         self._crc = crc
         self._md5 = md5
         self._sha1 = sha1
-        self._string = None
 
     @classmethod
     def fromRhdnet(cls, metadata_tuples, language, name, rom, size, crc, md5, sha1):
@@ -125,11 +124,11 @@ class Hack():
         return 'www.romhacking.net/hacks' in url_str
 
     @staticmethod
-    def get_rhdn_path(url_str):
+    def get_rhdn_url(url_str):
         try:
             url = urlparse(url_str)
             if url.netloc and url.netloc in 'www.romhacking.net':
-                return url.path
+                return url
         except ValueError as e: 
             return None
         return None
@@ -143,28 +142,23 @@ class Hack():
     def rhdn_paths(self):
         urls = []
         for com in self._comments:
-            loc = Hack.get_rhdn_path(com)
+            loc = Hack.get_rhdn_url(com)
             if loc:
-                urls.append(loc)
+                urls.append(loc.path)
         return urls
 
     def __str__(self):
-        if self._string:
-            return self._string
         comments = ''
         for com in self._comments:
             comments += '\n    comment "{}"'.format(com)
 
-        self._string = '''
+        return '''
 game (
     name "{}"
     description "{}"
     rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
 )'''.format(self._name, self._description, 
             self._rom, self._size, self._crc, self._md5, self._sha1, comments)
-        return self._string
-
-
 
 def hack_entry():
     '''clrmamepro ra hacks entries parser. Keeps a string representation and a url list'''
@@ -405,23 +399,68 @@ def line_by_line_diff(a, b):
     return out
 
 def filter_hacks(hacks, merge_hacks):
-    #this filters out of the old dat old hacks with a new equivalent
-    #the only thing that can semi-reliably identify a duplicate is the hack urls
-    #Abort 'duplicate' erasure on different file extensions for old and new
-    #(this can happen easily on N64 that has different byte order rom formats)
-    #Can't handle 2+ hack entries with romhacking urls but different contents
-    #(imagine a author putting optional patches on the same page)
-    for p_hack in hacks:
-        for i, m_hack in reversed(list(enumerate(merge_hacks))):#iterate backwards for del
-            if m_hack.rom_extension == p_hack.rom_extension and m_hack.rhdn_paths == p_hack.rhdn_paths:
-                a = str(m_hack)
-                b = str(p_hack)
-                if a != b:
+    """ this filters out of the old dat old hacks with a new equivalent
+        the only thing that can semi-reliably identify a duplicate is the hack urls
+        when two roms have the same urls and equal extension, it's a replacement.
+        but when two roms have the same urls and different extensions, it's probably
+        another version of the format after the patch converted.
+        (this can happen easily on N64 that has different byte order rom formats)
+        to deal with this (merge as many clone differences as possible) ignore the 
+        everything but the name, description and filename (without extension)
+
+        If the user does indeed have a patch for that extension it will later update
+        it, but if not, at least the names stay consistent.
+
+        This can't handle 2+ hacks with romhacking urls but different contents
+        (imagine a author putting optional patches on the same page). In that case 
+        one will win but at least the change is shown.
+    """
+    #h is the destination (the one who remains if a match happens)
+    #mh is the source (the one who gets edited to turn into h)
+    length = len(merge_hacks)
+    for a, h in reversed(list(enumerate(hacks))):
+        #optimizations
+        rhdn_paths = h.rhdn_paths
+        extension  = h.rom_extension
+        filename   = "".join(h._rom.rsplit(extension))
+
+        for b, mh in enumerate(merge_hacks):
+            ph = h #restore possible scratchpad.
+            if rhdn_paths and rhdn_paths == mh.rhdn_paths: #not empty and equal
+                if extension == mh.rom_extension:
+                    merge_hacks[b] = ph
+                    del hacks[a]
+                else:
+                    #it must be the source to be edited to keep data 'live' in the list
+                    #but then we need a new 'source'
+                    copy = Hack(mh._name, mh._description, mh._comments, mh._rom, mh._size, mh._crc, mh._md5, mh._sha1)
+                    mh._name = ph._name
+                    mh._description = ph._description
+                    mh._rom = filename + mh.rom_extension
+                    #we know we have the equal rhdn_paths in the same order, 
+                    #but there may be extra comments not to destroy
+                    newcomms = mh._comments[:] #copy list to not nuke it
+                    for phcom in ph._comments:
+                        if Hack.get_rhdn_url(phcom):
+                            for c, nhcomm in enumerate(newcomms):
+                                if Hack.get_rhdn_url(nhcomm):
+                                    newcomms[c] = phcom
+                    mh._comments = newcomms
+
+                    #to show these changes to the user, mh will turn to the destination
+                    ph = mh  #this causes a bug if we hadn't restored the scratchpad
+                    mh = copy
+
+                difa = str(mh)
+                difb = str(ph)
+                if difa != difb:
                     #diff works better line by line for humans. TODO ask the user?
-                    diff = line_by_line_diff(a, b)
+                    diff = line_by_line_diff(difa, difb)
                     print('warn: merge-dat hack overriden by:{}'.format(diff), file=sys.stderr)
 
-                del merge_hacks[i]
+    assert length == len(merge_hacks), 'modify elements in place!'
+
+                
 
 def write_to_file(file, hacks, merge_dat):
     if merge_dat:
@@ -551,7 +590,7 @@ def parse_args():
     parser.add_argument('p', metavar=('search-path'), type=str, help=desc_search)
     parser.add_argument('r', metavar=('rom-type'), type=str, help=desc_ext)
     #dont clobber file because we may read from it in -m. move tmpfile over it later
-    parser.add_argument('-o', metavar=('output-file'), type=FileType('r+', encoding='utf-8'), help=desc_output)
+    parser.add_argument('-o', metavar=('output-file'), type=FileType('a+', encoding='utf-8'), help=desc_output)
     parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
     parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
     parser.add_argument('-i', action='store_true', help=desc_ignore)
