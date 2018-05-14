@@ -81,7 +81,7 @@ class Hack():
                 last_translation = title
                 last_translation_author = author
             elif Hack.is_rhdn_hack(url):
-                description = '{}{} hack by {} version ({})'.format(' + ' if count else '', title, author, version)
+                description += '{}{} hack by {} version ({})'.format(' + ' if count else '', title, author, version)
                 count_hacks = count_hacks + 1
                 if not first_hack:
                     first_hack = title
