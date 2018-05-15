@@ -34,7 +34,6 @@ class InternetFatalError(Exception):
         super().__init__(message)
         self.errors = errors
 
-
 '''wrapper class for the retroarch hack dat files'''
 class Hack():
     
@@ -71,7 +70,7 @@ class Hack():
         #hacks have no language, translations always do
         comments = []
         description = ''
-        count = 0
+        count = False
         for title, author, version, url in metadata_tuples:
             comments.append(url)
             if Hack.is_rhdn_translation(url):
@@ -87,7 +86,7 @@ class Hack():
                     first_hack_author = author
             else:
                 assert False
-            count += 1
+            count = True
 
         main_title = name
         if count_hacks > 0 and count_translations == 0:
@@ -161,7 +160,7 @@ game (
             self._rom, self._size, self._crc, self._md5, self._sha1, comments)
 
 def hack_entry():
-    '''clrmamepro ra hacks entries parser. Keeps a string representation and a url list'''
+    '''clrmamepro ra hacks entries parser'''
     def always_leading_zero_in_crc(token):
         return token[0].zfill(8)
 
@@ -326,14 +325,15 @@ def read_version_file(possible_metadata):
         raise ScriptError('has version file, but no valid contents')
     for version, url in hacks_list:
         if not (Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url) ):
-            raise ScriptError('has non romhacking urls in version file')
+            raise ScriptError('has no valid romhacking urls in version file')
     return hacks_list
 
 def get_romhacking_data(rom, possible_metadata):
     metadata = []
     language = None
+    version_hacks = read_version_file(possible_metadata)
     try:
-        for (version, url) in read_version_file(possible_metadata):
+        for (version, url) in version_hacks:
             page = urllib.request.urlopen(url).read()
             soup = BeautifulSoup(page, 'lxml')
             info = soup.find('table', class_='entryinfo entryinfosmall').find('tbody')
@@ -366,7 +366,7 @@ def get_romhacking_data(rom, possible_metadata):
             if remote_version and remote_version != version:
               print("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
         return (metadata, language)
-    except Exception as e:
+    except Exception as e: #all exceptions (except the version file ones)
         raise InternetFatalError('rhdndata requires a active internet connection', e)
 
 def get_dat_rom_name(dat, dat_crc32):
@@ -415,18 +415,18 @@ def filter_hacks(hacks, merge_hacks):
         (imagine a author putting optional patches on the same page). In that case 
         one will win but at least the change is shown.
     """
-    #h is the destination (the one who remains if a match happens)
+    #h is the destination (the new hack if a match happens)
     #mh is the source (the one who gets edited to turn into h)
     length = len(merge_hacks)
+    overriden_diffs = []
     for a, h in reversed(list(enumerate(hacks))):
         #optimizations
-        rhdn_paths = h.rhdn_paths
+        rhdn_paths = h.rhdn_paths #version file invariant: len(paths) > 0
         extension  = h.rom_extension
         filename   = "".join(h._rom.rsplit(extension))
-
         for b, mh in enumerate(merge_hacks):
             ph = h #restore possible scratchpad.
-            if rhdn_paths and rhdn_paths == mh.rhdn_paths: #not empty and equal
+            if rhdn_paths == mh.rhdn_paths:
                 if extension == mh.rom_extension:
                     merge_hacks[b] = ph
                     del hacks[a]
@@ -454,13 +454,19 @@ def filter_hacks(hacks, merge_hacks):
                 difa = str(mh)
                 difb = str(ph)
                 if difa != difb:
-                    #diff works better line by line for humans. TODO ask the user?
                     diff = line_by_line_diff(difa, difb)
-                    print('warn: merge-dat hack overriden by:{}'.format(diff), file=sys.stderr)
+                    overriden_diffs.append(diff)
 
     assert length == len(merge_hacks), 'modify elements in place!'
-
-                
+    #after if i want to allow user intervention in edits, this must be done differently
+    #(two passses, one to collect modifications, one for making changes...)
+    if overriden_diffs:
+        l = len(overriden_diffs)
+        lstr = ( str(l)+' ' ) if l > 1 else ''
+        lsuffix = '' if l == 1 else 's'
+        print('warn: {}merge-file hack{} overriden:'.format(lstr, lsuffix), file=sys.stderr, end='')
+        for diff in overriden_diffs:
+            print(diff, file=sys.stderr)
 
 def write_to_file(file, hacks, merge_dat):
     if merge_dat:
@@ -474,7 +480,6 @@ def write_to_file(file, hacks, merge_dat):
         hacks = flat_list + hacks
     for hack in hacks:
         file.write(str(hack))
-        
 
 def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
     skip_bytes = 0
