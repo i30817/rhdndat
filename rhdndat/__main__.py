@@ -6,6 +6,7 @@ from argparse import FileType
 from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
 from contextlib import contextmanager
+from collections import Counter
 
 from rhdndat.__init__ import *
 
@@ -36,7 +37,7 @@ class InternetFatalError(Exception):
 
 '''wrapper class for the retroarch hack dat files'''
 class Hack():
-    
+
     def __init__(self, name, description, comments, rom, size, crc, md5, sha1):
         self._name = name
         self._description = description
@@ -46,6 +47,7 @@ class Hack():
         self._crc = crc
         self._md5 = md5
         self._sha1 = sha1
+        self._paths = None
 
     @classmethod
     def fromRhdnet(cls, metadata_tuples, language, name, rom, size, crc, md5, sha1):
@@ -54,7 +56,7 @@ class Hack():
           first hack with zero translations > rom_title > last translation > first hack
           secondary name be:
           [(last)T-lang by author] for 1+ T and 0 hacks (translations are only multiple if addendums)
-          [(last)T-lang by author + # Hacks] for 1+ T and 1+ hacks + 
+          [(last)T-lang by author + # Hacks] for 1+ T and 1+ hacks +
           [(first) Hack by author] for 0 T and 1 hack
           [(first) Hack by author + # hacks] for 0 T and 1+ hack
           # is always equal to (number of translations + number of hacks -1) when it appears
@@ -128,7 +130,7 @@ class Hack():
             url = urlparse(url_str)
             if url.netloc and url.netloc in 'www.romhacking.net':
                 return url
-        except ValueError as e: 
+        except ValueError as e:
             return None
         return None
 
@@ -138,13 +140,16 @@ class Hack():
         return extension.lower()
 
     @property
-    def rhdn_paths(self):
-        urls = []
+    def rhdn_paths(self): #cache this
+        if self._paths:
+            return self._paths
+
+        self._paths = []
         for com in self._comments:
             loc = Hack.get_rhdn_url(com)
             if loc:
-                urls.append(loc.path)
-        return urls
+                self._paths.append(loc.path)
+        return self._paths
 
     def __str__(self):
         comments = ''
@@ -156,7 +161,7 @@ game (
     name "{}"
     description "{}"
     rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
-)'''.format(self._name, self._description, 
+)'''.format(self._name, self._description,
             self._rom, self._size, self._crc, self._md5, self._sha1, comments)
 
 def hack_entry():
@@ -271,8 +276,8 @@ def which(executable):
     return flips
 
 def producer(arguments, generator_function):
-    ''' will append a output fifo to the end of the argument list prior to 
-        applying the generator function to that fifo. Make sure the command 
+    ''' will append a output fifo to the end of the argument list prior to
+        applying the generator function to that fifo. Make sure the command
         output is setup for the last argument to be a output file in the arguments
     '''
     BLOCKSIZE = 2 ** 20
@@ -281,15 +286,14 @@ def producer(arguments, generator_function):
     with named_pipes() as pipes:
         pipe = pipes[0]
         arguments.append(pipe)
-        with subprocess.Popen(arguments, 
-                stdout=subprocess.DEVNULL, 
+        with subprocess.Popen(arguments,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL) as process:
             with open(pipe, 'rb') as fifo:
                 bytes = fifo.read(BLOCKSIZE)
                 while len(bytes) > 0:
                     generator_function.send(bytes)
                     bytes = fifo.read(BLOCKSIZE)
-    
     #if a error occurred avoid writing bogus checksums
     if process.returncode != 0:
         raise ScriptError('error during patching, try to remove the header if a snes rom')
@@ -308,7 +312,7 @@ def patch_producer(patch, source, generator_function):
             raise ScriptError('flips not found')
         return producer([flips, '--exact', '-a', patch, source], generator_function)
 
-#version files contain sequences of two lines: a version number and a romhacking url    
+#version files contain sequences of two lines: a version number and a romhacking url
 def read_version_file(possible_metadata):
     hacks_list = []
     try:
@@ -376,7 +380,6 @@ def get_dat_rom_name(dat, dat_crc32):
     return None
 
 def line_by_line_diff(a, b):
-    
     def process_tag(tag, i1, i2, j1, j2):
         if tag == 'replace':
             return Fore.BLUE + matcher.b[j1:j2] + Fore.RESET
@@ -398,75 +401,133 @@ def line_by_line_diff(a, b):
         marker = '\n'
     return out
 
+def partition(pred, iterable):
+    t1, t2 = itertools.tee(iterable)
+    return filter(pred, t1), itertools.filterfalse(pred, t2)
+
 def filter_hacks(hacks, merge_hacks):
-    """ this filters out of the old dat old hacks with a new equivalent
-        the only thing that can semi-reliably identify a duplicate is the hack urls
-        when two roms have the same urls and equal extension, it's a replacement.
-        but when two roms have the same urls and different extensions, it's probably
-        another version of the format after the patch converted.
-        (this can happen easily on N64 that has different byte order rom formats)
-        to deal with this (merge as many clone differences as possible) ignore the 
-        everything but the name, description and filename (without extension)
+    """ This filters out of the old dat old hacks with a new equivalent
+        It also updates fields in other non-completely matching hacks but
+        that have the same source urls.
 
-        If the user does indeed have a patch for that extension it will later update
-        it, but if not, at least the names stay consistent.
+        algorithm:
+        Invariant: if it exists, a complete match is always the last change
+        Invariant: two repeated runs won't show further changes
 
-        This can't handle 2+ hacks with romhacking urls but different contents
-        (imagine a author putting optional patches on the same page). In that case 
-        one will win but at least the change is shown.
+        warnings: warn on 2+ cds of the same hack need the same name on updates
+        error cases:
+            It's possible 2+ hacks with same romhacking urls and different optional patches
+            to have their text replaced, but that case is kept to 'different extensions'
+            to minimize the 'different functionality' and maximize the 'different fileformat'
+            Same extension but different filenames are not touched on (for multiple discs etc)
+            So this should be very rare. The change will show on diffs
     """
-    #h is the destination (the new hack if a match happens)
-    #mh is the source (the one who gets edited to turn into h)
-    length = len(merge_hacks)
-    overriden_diffs = []
-    for a, h in reversed(list(enumerate(hacks))):
-        #optimizations
-        rhdn_paths = h.rhdn_paths #version file invariant: len(paths) > 0
-        extension  = h.rom_extension
-        filename   = "".join(h._rom.rsplit(extension))
-        for b, mh in enumerate(merge_hacks):
-            ph = h #restore possible scratchpad.
-            if rhdn_paths == mh.rhdn_paths:
-                if extension == mh.rom_extension:
-                    merge_hacks[b] = ph
-                    del hacks[a]
-                else:
-                    #it must be the source to be edited to keep data 'live' in the list
-                    #but then we need a new 'source'
-                    copy = Hack(mh._name, mh._description, mh._comments, mh._rom, mh._size, mh._crc, mh._md5, mh._sha1)
-                    mh._name = ph._name
-                    mh._description = ph._description
-                    mh._rom = filename + mh.rom_extension
-                    #we know we have the equal rhdn_paths in the same order, 
-                    #but there may be extra comments not to destroy
-                    newcomms = mh._comments[:] #copy list to not nuke it
-                    for phcom in ph._comments:
-                        if Hack.get_rhdn_url(phcom):
-                            for c, nhcomm in enumerate(newcomms):
-                                if Hack.get_rhdn_url(nhcomm):
-                                    newcomms[c] = phcom
-                    mh._comments = newcomms
+    diffs = {}
+    delete_marker = object()
 
-                    #to show these changes to the user, mh will turn to the destination
-                    ph = mh  #this causes a bug if we hadn't restored the scratchpad
-                    mh = copy
+    def frozen(index, hack):
+        already = diffs.get(index, None)
+        if not already:
+            diffs[index] = str(hack)
+        return already
 
-                difa = str(mh)
-                difb = str(ph)
-                if difa != difb:
-                    diff = line_by_line_diff(difa, difb)
-                    overriden_diffs.append(diff)
+    def update(ix, x, iy, y):
+        frozen(iy, y)
+        merge_hacks[iy] = x
+        hacks[ix] = delete_marker
 
-    assert length == len(merge_hacks), 'modify elements in place!'
+    def one_cardinality(lst, error, index, h):
+        not_already_done = hacks[index] != delete_marker
+        if not_already_done and len(lst) == 1:
+            update(index, h, *lst[0])
+        elif len(lst) > 1:
+            print('{}{}'.format('skip: ' if not_already_done else 'warn: ', error), file=sys.stderr)
+            hacks[index] = delete_marker
+
+    for index, h in enumerate(hacks):
+
+        if h == delete_marker:
+            continue
+
+        candidates = [ (i,x) for i,x in enumerate(merge_hacks) if x.rhdn_paths == h.rhdn_paths ]
+        if not candidates:
+            continue
+
+        if len(candidates) == 1:
+            update(index, h, *candidates[0])
+            continue
+
+        count = Counter()
+        def counter(ix,x,iy,y):
+            count[x._rom] +=1
+            count[y._rom] +=1
+            return (ix,x,iy,y)
+
+        #including current, this is the strict match for the filename equality matrix
+        other_cd_hacks = [ x for x in enumerate(hacks[index:]) if x[1]!=delete_marker and x[1].rhdn_paths == h.rhdn_paths]
+        a= [ counter(ix,x,iy,y) for ix,x in other_cd_hacks for iy,y in candidates if x._rom == y._rom ] 
+
+        #at least one, for all ._rom that match only occur on a single pair (x,y)
+        #(verification matching number of cds or single rom with same name)
+        if count and all( x[1] == 2 for x in count.most_common() ):
+            for tuple_mult in a:
+                update(*tuple_mult)
+            #we can done here because we matched a pair with the same filename
+            #but continue on for the 'extension' overrides and their warnings
+        elif len(a) > 0:
+            #there were at least some hacks from the same pages with the same filename
+            #but they didn't match 1 to 1 in filenames number
+            print('''\
+skip: refusing to add or override hacks because they don\'t \
+have the right number of entries on the merge-file, are you \
+missing a cd or adding one?'''
+            , file=sys.stderr)
+            for ix,x in other_cd_hacks:
+                print('{}'.format(x._name), file=sys.stderr)
+                hacks[ix] = delete_marker
+            continue
+
+        extension = h.rom_extension
+        (ext, not_ext) = partition(lambda x: x[1].rom_extension == extension, candidates)
+        #since to get here we already matched and removed or didn't match and
+        #removed all the candidates with equal h._rom, counting even different extensions
+        #(ie: cds with significant names and filenames), it's ok, if destructive to mess
+        #around with some properties of other fileformats of the same hack that might not have
+        #a override (but skip if they're already frozen).
+        for i2, h2 in not_ext:
+            if not frozen(i2, h2):
+                for ncom in h._comments:
+                    if Hack.get_rhdn_url(ncom):
+                        for (i, ocom) in enumerate(h2._comments):
+                            if Hack.get_rhdn_url(ocom):
+                                h2._comments[i] = ncom
+                h2._name = h._name
+                h2._description = h._description
+                filename_minus_extension = ''.join(h._rom.rsplit(extension))
+                h2._rom = filename_minus_extension + h2.rom_extension
+
+        #regardless of extension, match crc, then match extension. Present errors both times
+        matches = [ (ix,x) for ix,x in candidates if x._crc == h._crc ]
+        ext = list(ext)
+        error = "'{}', {} matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
+        one_cardinality(matches, error, index, h)
+        error = "'{}', there were multiple extension matches but this isn't a multi-rom hack".format(h._name)
+        one_cardinality(ext, error, index, h)
+
+    for i,x in reversed(list(enumerate(hacks))):
+        if x == delete_marker:
+            del hacks[i]
+
     #after if i want to allow user intervention in edits, this must be done differently
-    #(two passses, one to collect modifications, one for making changes...)
-    if overriden_diffs:
-        l = len(overriden_diffs)
+    diffs = [ line_by_line_diff(value, str(merge_hacks[key])) for key,value in diffs.items() if str(merge_hacks[key]) != value]
+    if diffs:
+        l = len(diffs)
         lstr = ( str(l)+' ' ) if l > 1 else ''
         lsuffix = '' if l == 1 else 's'
         print('warn: {}merge-file hack{} overriden:'.format(lstr, lsuffix), file=sys.stderr, end='')
-        for diff in overriden_diffs:
-            print(diff, file=sys.stderr)
+        for value in diffs:
+            print(value, file=sys.stderr, end='')
+        print('',file=sys.stderr)
 
 def write_to_file(file, hacks, merge_dat):
     if merge_dat:
@@ -475,7 +536,6 @@ def write_to_file(file, hacks, merge_dat):
         header = merge_dat.pop(0)
         file.write( header )
         flat_list = [item for sublist in merge_dat.hacks for item in sublist]
-        
         filter_hacks(hacks, flat_list)
         hacks = flat_list + hacks
     for hack in hacks:
@@ -511,7 +571,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
             possible_metadata = os.path.join(dirpath,'version')
 
             if not os.path.isfile(possible_metadata):
-                if patches: 
+                if patches:
                     print("warn: '{}' : has patches without a version file".format(rom), file=sys.stderr)
                 continue
 
@@ -533,6 +593,11 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 if softpatch:
                     patch = patches[0]
+
+                if DEBUG:
+                    hack = Hack.fromRhdnet(metadata,language,"BOGUS",rom,0,''.zfill(8),''.zfill(32),''.zfill(40))
+                    hacks.append(hack)
+                    continue
 
                 #if using dat file for name, find the rom on dat
                 rom_title = None
@@ -580,61 +645,60 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 continue
 
     if output_file:
-        #dont add a try-except, it's not clear how to capture tmp_file to delete it on error
         with NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8') as tmp_file:
             write_to_file(tmp_file, hacks, merge_dat)
-
         shutil.move(tmp_file.name, output_file.name)
     else:
         write_to_file(sys.stdout, hacks, merge_dat)
 
-
 def parse_args():
+    def no_dot_in_extension(r_in):
+        if '.' in r_in:
+            raise argparse.ArgumentTypeError("extension must not have a dot")
+        return r_in
+    def searchpath_is_dir(p_in):
+        if not os.path.isdir(p_in):
+            raise argparse.ArgumentTypeError("must be a dir")
+        return p_in
     types = argparse.RawTextHelpFormatter
     parser = argparse.ArgumentParser(description=desc_with_version, formatter_class=types)
-    parser.add_argument('p', metavar=('search-path'), type=str, help=desc_search)
-    parser.add_argument('r', metavar=('rom-type'), type=str, help=desc_ext)
+    parser.add_argument('p', metavar=('search-path'), type=searchpath_is_dir, help=desc_search)
+    parser.add_argument('r', metavar=('rom-type'), type=no_dot_in_extension, help=desc_ext)
     #dont clobber file because we may read from it in -m. move tmpfile over it later
     parser.add_argument('-o', metavar=('output-file'), type=FileType('a+', encoding='utf-8'), help=desc_output)
     parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
     parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
     parser.add_argument('-i', action='store_true', help=desc_ignore)
     parser.add_argument('-t', action='store_true', help=desc_check)
-    return parser.parse_args()
+    return parser
 
+DEBUG=0
 def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
+
+    parser = parse_args()
+    args = parser.parse_args()
+
     flips = which('flips')
     xdelta = which('xdelta3')
     if not (flips and xdelta):
         print('error: rhdndat needs xdelta3 and flips on the path or script dir', file=sys.stderr)
         return 1
 
-    signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
-
-    args = parse_args()
-
-    if '.' in args.r or not os.path.isdir(args.p):
-        parser.print_help()
+    if args.t:
+        args.o = None
+        args.m = None
+        args.d = None
+        args.i = False
+    try:
+        dat = None if not args.m else hack_dat(args.m)
+        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
+    except ParseException as e: #fail early for parsing this to prevent data loss
+        print("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e), file=sys.stderr)
         return 1
-    else:
-        if args.t:
-            args.o = None
-            args.m = None
-            args.d = None
-            args.i = False
-        try:
-            dat = None if not args.m else hack_dat(args.m)
-            make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
-        except ParseException as e: #fail early for parsing this to prevent data loss
-            print("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e), file=sys.stderr)
-            return 1
-        except InternetFatalError as e:
-            print('error: {}'.format(e), file=sys.stderr)
-            return 1
-    return 0
+    except InternetFatalError as e:
+        print('error: {}'.format(e), file=sys.stderr)
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main())
-
-
-
