@@ -517,7 +517,7 @@ def filter_hacks(hacks, merge_hacks):
         #this needs to be obey frozen (ideally freeze values themselves if not frozen)
         #TODO Version could conflict (needs better parsers to fix)
         extension = h.rom_extension
-        not_ext = [ (i,x) for i,x in candidates if not_frozen(ix) and x.rom_extension != extension]
+        not_ext = [ (ix,x) for ix,x in candidates if not_frozen(ix) and x.rom_extension != extension]
         for i2, h2 in not_ext:
             freeze(i2, h2)
             h2._name = h._name
