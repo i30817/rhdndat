@@ -410,10 +410,6 @@ def line_by_line_diff(a, b):
         marker = '\n'
     return out
 
-def partition(pred, iterable):
-    t1, t2 = itertools.tee(iterable)
-    return filter(pred, t1), itertools.filterfalse(pred, t2)
-
 def filter_hacks(hacks, merge_hacks):
     """ This filters out of the old dat old hacks with a new equivalent
         It also updates fields in other non-completely matching hacks but
@@ -434,25 +430,30 @@ def filter_hacks(hacks, merge_hacks):
     diffs = {}
     delete_marker = object()
 
-    def frozen(index, hack):
+    def freeze(index, hack):
         already = diffs.get(index, None)
         if not already:
             diffs[index] = str(hack)
         return already
 
+    def not_frozen(index):
+        return diffs.get(index, None) == None
+
     def update(ix, x, iy, y):
-        frozen(iy, y)
+        freeze(iy, y)
         merge_hacks[iy] = x
         hacks[ix] = delete_marker
 
     def match_one_if_available(lst, error, index, h):
-        #print a error regardless if available when the multiple candidates exist after this check
-        if hacks[index] != delete_marker and len(lst) == 1:
+        available = hacks[index] != delete_marker
+        if available and len(lst) == 1:
             update(index,h,*lst[0])
-        elif len(lst) > 0:
+        elif len(lst) > 1:
             warn(error)
             for iy,y in lst:
                 warn('\u2022 ' + y._name)
+
+    clone_hacks = list(hacks)
 
     for index, h in enumerate(hacks):
 
@@ -474,55 +475,55 @@ def filter_hacks(hacks, merge_hacks):
             return (ix,x,iy,y)
 
         #including current, this is the strict match for the filename equality matrix
-        other_cd_hacks = [ x for x in enumerate(hacks[index:]) if x[1]!=delete_marker and x[1].rhdn_paths == h.rhdn_paths]
+        other_cd_hacks = [ x for x in enumerate(hacks[index:], index) if x[1]!=delete_marker and x[1].rhdn_paths == h.rhdn_paths]
         a= [ counter(ix,x,iy,y) for ix,x in other_cd_hacks for iy,y in candidates if x._rom.lower() == y._rom.lower() ] 
 
-        #at least one, for all ._rom that match only occur on a single pair (x,y)
-        #(verification matching number of cds or single rom with same name)
-        #this doesn't verify that the cd/hacks # is right, hacks may be missing 
-        #a cd/rom (undesirable but unverifiable) or add a extra missing one (desirable)
-        if count and all( x[1] == 2 for x in count.most_common() ):
-            for tuple_mult in a:
-                update(*tuple_mult)
-            #we can done here because h matched a pair with the same filename
-            #but continue on for the 'extension' overrides and their warnings
-        elif len(a) > 0:
+        #for all ._rom that match, they only match on a single pair (x,y)
+        #Any hack in A (that is of the same urls and with equal romnames on hacks and merge_hacks)
+        #will 'frozen' after the below branches, regardless if it matched anything or not, and hacks
+        #in 'hacks' will be marked for deletion. The following operations must respect 'frozen' status
+        #cd hacks with different names will still be added as 'new' hacks, which is problematic
+        #if the crc check below doesn't catch it (ie, it's a new version)
+        if len(a) > 1 and all( x[1] == 2 for x in count.most_common() ):
+            warn('warn: updating hack as a multi-medium hack because of multiple matching filenames')
+            for tuples in a:
+                update(*tuples)
+                warn('\u2022 ' + tuples[3]._rom)
+        elif len(a) > 1:
             warn('skip: you have the wrong number of hacks with the same urls+filename on either the scanned roms or the merge file')
             for ix,_,iy,y in a:
-                if not frozen(iy,y):
+                if not freeze(iy,y):
                     hacks[ix] = delete_marker
-                    warn('\u2022 ' + y._name)
-            #ditto
+                    warn('\u2022 ' + y._rom)
 
-        not_frozen = [(ix,x) for ix,x in candidates if not diffs.get(ix, None) ]
-        extension = h.rom_extension
-        (ext, not_ext) = partition(lambda x: x[1].rom_extension == extension, not_frozen)
-
-        matches = [ (ix,x) for ix,x in not_frozen if x._crc == h._crc ]
-        error = "warn: '{}', {} extra matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
+        #same hack crc -> same hack version
+        matches = [ (ix,x) for ix,x in candidates if not_frozen(ix) and x._crc == h._crc ]
+        error = "warn: '{}', {} matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
         match_one_if_available(matches, error, index, h)
 
-        ext = list(ext)
-        error = "warn: '{}', {} extra urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
+        #only hack with a fileformat after 'cd' elimination -> only hack possibility
+        extension = h.rom_extension
+        ext = [ (ix,x) for ix,x in candidates if not_frozen(ix) and x.rom_extension == extension ]
+        error = "warn: '{}', {} urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
         match_one_if_available(ext, error, index, h)
 
-        #replace on other rom fileformats even if we don't have a match besides urls
-        #this is fine because the assignments this hack could conflict with are frozen
-        #(the filename group match and the same crc checks above). 
-        #TODO Version could conflict if a version update happens and the user don't 
-        #bother to have rom scans for those hacks. Unfortunately the parser can't 
-        #handle versions to ignore them.
+        #non-match update for hacks with different fileformats where the 
+        #user only has one softpatch ready but the program can tell others apply
+        #this needs to be obey frozen (ideally freeze values themselves if not frozen)
+        #TODO Version could conflict (needs better parsers to fix)
+        extension = h.rom_extension
+        not_ext = [ (i,x) for i,x in candidates if x.rom_extension != extension]
         for i2, h2 in not_ext:
-            if not frozen(i2, h2):
+            if not freeze(i2, h2):
+                h2._name = h._name
+                h2._description = h._description
+                filename_minus_extension = ''.join(h._rom.rsplit(extension))
+                h2._rom = filename_minus_extension + h2.rom_extension
                 for ncom in h._comments:
                     if Hack.get_rhdn_url(ncom):
                         for (i, ocom) in enumerate(h2._comments):
                             if Hack.get_rhdn_url(ocom):
                                 h2._comments[i] = ncom
-                h2._name = h._name
-                h2._description = h._description
-                filename_minus_extension = ''.join(h._rom.rsplit(extension))
-                h2._rom = filename_minus_extension + h2.rom_extension
 
     for i,x in reversed(list(enumerate(hacks))):
         if x == delete_marker:
