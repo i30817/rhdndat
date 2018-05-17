@@ -34,7 +34,12 @@ def error(string, end='\n'):
 def log(string, end='\n'):
     print(Fore.BLUE + string + Fore.RESET, file=sys.stderr, end=end)
 
-class ScriptError(Exception):
+class FatalError(Exception):
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors
+
+class NonFatalError(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message)
         self.errors = errors
@@ -305,7 +310,7 @@ def producer(arguments, generator_function):
                     bytes = fifo.read(BLOCKSIZE)
     #if a error occurred avoid writing bogus checksums
     if process.returncode != 0:
-        raise ScriptError('error during patching, try to remove the header if a snes rom')
+        raise NonFatalError('error during patching, try to remove the header if a snes rom')
 
     return generator_function.send([])
 
@@ -313,12 +318,12 @@ def patch_producer(patch, source, generator_function):
     if patch.endswith('.xdelta'):
         xdelta = which('xdelta3')
         if not xdelta:
-            raise ScriptError('xdelta3 not found')
+            raise FatalError('xdelta3 not found')
         return producer([xdelta, '-d', '-s',  source, patch], generator_function)
     else:
         flips = which('flips')
         if not flips:
-            raise ScriptError('flips not found')
+            raise FatalError('flips not found')
         return producer([flips, '--exact', '-a', patch, source], generator_function)
 
 #version files contain sequences of two lines: a version number and a romhacking url
@@ -333,12 +338,12 @@ def read_version_file(possible_metadata):
                 if not url: break
                 hacks_list += [(version.strip(), url.strip())]
     except Exception as e:
-        raise ScriptError('has version file, but no valid contents')
+        raise NonFatalError('has version file, but no valid contents')
     if not hacks_list:
-        raise ScriptError('has version file, but no valid contents')
+        raise NonFatalError('has version file, but no valid contents')
     for version, url in hacks_list:
         if not (Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url) ):
-            raise ScriptError('has no valid romhacking urls in version file')
+            raise NonFatalError('has no valid romhacking urls in version file')
     return hacks_list
 
 def get_romhacking_data(rom, possible_metadata):
@@ -482,13 +487,13 @@ def filter_hacks(hacks, merge_hacks):
         #Any hack in A (that is of the same urls and with equal romnames on hacks and merge_hacks)
         #will 'frozen' after the below branches, regardless if it matched anything or not, and hacks
         #in 'hacks' will be marked for deletion. The following operations must respect 'frozen' status
-        #cd hacks with different names will still be added as 'new' hacks, which is problematic
+        #multi cd hacks with different names will still be added as 'new' hacks, which is problematic
         #if the crc check below doesn't catch it (ie, it's a new version)
         if len(a) > 1 and all( x[1] == 2 for x in count.most_common() ):
-            warn('warn: updating hack as a multi-medium hack because of multiple matching filenames')
+            log('info: updating hack as a multi-medium hack because of multiple matching filenames')
             for tuples in a:
                 update(*tuples)
-                warn('\u2022 ' + tuples[3]._rom)
+                log('\u2022 ' + tuples[3]._rom)
         elif len(a) > 1:
             warn('skip: you have the wrong number of hacks with the same urls+filename on either the scanned roms or the merge file')
             for ix,_,iy,y in a:
@@ -512,18 +517,18 @@ def filter_hacks(hacks, merge_hacks):
         #this needs to be obey frozen (ideally freeze values themselves if not frozen)
         #TODO Version could conflict (needs better parsers to fix)
         extension = h.rom_extension
-        not_ext = [ (i,x) for i,x in candidates if x.rom_extension != extension]
+        not_ext = [ (i,x) for i,x in candidates if not_frozen(ix) and x.rom_extension != extension]
         for i2, h2 in not_ext:
-            if not freeze(i2, h2):
-                h2._name = h._name
-                h2._description = h._description
-                filename_minus_extension = ''.join(h._rom.rsplit(extension))
-                h2._rom = filename_minus_extension + h2.rom_extension
-                for ncom in h._comments:
-                    if Hack.get_rhdn_url(ncom):
-                        for (i, ocom) in enumerate(h2._comments):
-                            if Hack.get_rhdn_url(ocom):
-                                h2._comments[i] = ncom
+            freeze(i2, h2)
+            h2._name = h._name
+            h2._description = h._description
+            filename_minus_extension = ''.join(h._rom.rsplit(extension))
+            h2._rom = filename_minus_extension + h2.rom_extension
+            for ncom in h._comments:
+                if Hack.get_rhdn_url(ncom):
+                    for (i, ocom) in enumerate(h2._comments):
+                        if Hack.get_rhdn_url(ocom):
+                            h2._comments[i] = ncom
 
     for i,x in reversed(list(enumerate(hacks))):
         if x == delete_marker:
@@ -595,12 +600,12 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 softpatch = True
                 if not patches:
                     if unknown_remove:
-                        raise ScriptError('no patches and a version file, hardpatch possible, but -i given')
+                        raise NonFatalError('no patches and a version file, hardpatch possible, but -i given')
                     warn("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom))
                     softpatch = False
 
                 if len(patches) > 1:
-                    raise ScriptError('multiple possible patches found')
+                    raise NonFatalError('multiple possible patches found')
 
                 if softpatch:
                     patch = patches[0]
@@ -637,7 +642,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                              rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
                     if unknown_remove and not rom_title:
-                        raise ScriptError("crc32 '{}' not found in dat".format(dat_crc32))
+                        raise NonFatalError("crc32 '{}' not found in dat".format(dat_crc32))
                     elif not rom_title:
                         warn("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32))
 
@@ -651,7 +656,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 #we don't process this now for merge-dat to work
                 hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                 hacks.append(hack)
-            except ScriptError as e: #let the default stop execution and print on other errors
+            except NonFatalError as e: #let the default stop execution and print on other errors
                 log("skip: '{}' : {}".format(rom, e))
                 continue
 
@@ -707,7 +712,7 @@ def main():
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
         return 1
-    except InternetFatalError as e:
+    except (FatalError, InternetFatalError) as e:
         error('error: {}'.format(e))
         return 1
 
