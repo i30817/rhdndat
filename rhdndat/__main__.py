@@ -459,41 +459,37 @@ def filter_hacks(hacks, merge_hacks):
 
         count = Counter()
         def counter(ix,x,iy,y):
-            count[x._rom] +=1
-            count[y._rom] +=1
+            count[x._rom.lower()] +=1
+            count[y._rom.lower()] +=1
             return (ix,x,iy,y)
 
         #including current, this is the strict match for the filename equality matrix
         other_cd_hacks = [ x for x in enumerate(hacks[index:]) if x[1]!=delete_marker and x[1].rhdn_paths == h.rhdn_paths]
-        a= [ counter(ix,x,iy,y) for ix,x in other_cd_hacks for iy,y in candidates if x._rom == y._rom ] 
+        a= [ counter(ix,x,iy,y) for ix,x in other_cd_hacks for iy,y in candidates if x._rom.lower() == y._rom.lower() ] 
 
         #at least one, for all ._rom that match only occur on a single pair (x,y)
         #(verification matching number of cds or single rom with same name)
+        #this doesn't verify that the cd/hacks # is right, hacks may be missing 
+        #a cd/rom (undesirable but unverifiable) or add a extra missing one (desirable)
         if count and all( x[1] == 2 for x in count.most_common() ):
             for tuple_mult in a:
                 update(*tuple_mult)
-            #we can done here because we matched a pair with the same filename
+            #we can done here because h matched a pair with the same filename
             #but continue on for the 'extension' overrides and their warnings
         elif len(a) > 0:
-            #there were at least some hacks from the same pages with the same filename
-            #but they didn't match 1 to 1 in filenames number
-            print('''\
-skip: refusing to add or override hacks because they don\'t \
-have the right number of entries on the merge-file, are you \
-missing a cd or adding one?'''
+            print('skip: you have the wrong number of hacks with the same urls+filename on either the scanned roms or the merge file'
             , file=sys.stderr)
-            for ix,x in other_cd_hacks:
-                print('{}'.format(x._name), file=sys.stderr)
-                hacks[ix] = delete_marker
+            for ix,_,iy,y in a:
+                if not frozen(iy,y):
+                    hacks[ix] = delete_marker
+                    print('{}'.format(y._name), file=sys.stderr)
             continue
 
         extension = h.rom_extension
         (ext, not_ext) = partition(lambda x: x[1].rom_extension == extension, candidates)
-        #since to get here we already matched and removed or didn't match and
-        #removed all the candidates with equal h._rom, counting even different extensions
-        #(ie: cds with significant names and filenames), it's ok, if destructive to mess
-        #around with some properties of other fileformats of the same hack that might not have
-        #a override (but skip if they're already frozen).
+        #since to get here we already matched and froze or didn't match and froze 
+        #all the candidates with equal urls+h._rom, counting even different extensions
+        #(ie: removed or fixed cds with significant names and filenames), inplace modification is fine
         for i2, h2 in not_ext:
             if not frozen(i2, h2):
                 for ncom in h._comments:
