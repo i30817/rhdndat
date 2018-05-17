@@ -511,7 +511,7 @@ missing a cd or adding one?'''
         ext = list(ext)
         error = "'{}', {} matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
         one_cardinality(matches, error, index, h)
-        error = "'{}', there were multiple extension matches but this isn't a multi-rom hack".format(h._name)
+        error = "'{}', {} urls+extension matches after full filename (multi-cd) filtering".format(h._name, len(ext))
         one_cardinality(ext, error, index, h)
 
     for i,x in reversed(list(enumerate(hacks))):
