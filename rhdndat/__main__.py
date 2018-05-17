@@ -25,6 +25,15 @@ from pyparsing import *
 from colorama import Fore, Back, Style, init
 init()
 
+def nc_warn(string, end='\n'):
+    print(string, file=sys.stderr, end=end)
+def warn(string, end='\n'):
+    print(Fore.YELLOW + string + Fore.RESET, file=sys.stderr, end=end)
+def error(string, end='\n'):
+    print(Fore.RED + string + Fore.RESET, file=sys.stderr, end=end)
+def log(string, end='\n'):
+    print(Fore.BLUE + string + Fore.RESET, file=sys.stderr, end=end)
+
 class ScriptError(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message)
@@ -368,7 +377,7 @@ def get_romhacking_data(rom, possible_metadata):
 
             remote_version = info.find('th', string='Patch Version').nextSibling.string.strip()
             if remote_version and remote_version != version:
-              print("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version), file=sys.stderr)
+              warn("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version))
         return (metadata, language)
     except Exception as e: #all exceptions (except the version file ones)
         raise InternetFatalError('rhdndata requires a active internet connection', e)
@@ -436,13 +445,14 @@ def filter_hacks(hacks, merge_hacks):
         merge_hacks[iy] = x
         hacks[ix] = delete_marker
 
-    def one_cardinality(lst, error, index, h):
-        not_already_done = hacks[index] != delete_marker
-        if not_already_done and len(lst) == 1:
-            update(index, h, *lst[0])
-        elif len(lst) > 1:
-            print('{}{}'.format('skip: ' if not_already_done else 'warn: ', error), file=sys.stderr)
-            hacks[index] = delete_marker
+    def match_one_if_available(lst, error, index, h):
+        #print a error regardless if available when the multiple candidates exist after this check
+        if hacks[index] != delete_marker and len(lst) == 1:
+            update(index,h,*lst[0])
+        elif len(lst) > 0:
+            warn(error)
+            for iy,y in lst:
+                warn('\u2022 ' + y._name)
 
     for index, h in enumerate(hacks):
 
@@ -477,19 +487,31 @@ def filter_hacks(hacks, merge_hacks):
             #we can done here because h matched a pair with the same filename
             #but continue on for the 'extension' overrides and their warnings
         elif len(a) > 0:
-            print('skip: you have the wrong number of hacks with the same urls+filename on either the scanned roms or the merge file'
-            , file=sys.stderr)
+            warn('skip: you have the wrong number of hacks with the same urls+filename on either the scanned roms or the merge file')
             for ix,_,iy,y in a:
                 if not frozen(iy,y):
                     hacks[ix] = delete_marker
-                    print('{}'.format(y._name), file=sys.stderr)
-            continue
+                    warn('\u2022 ' + y._name)
+            #ditto
 
+        not_frozen = [(ix,x) for ix,x in candidates if not diffs.get(ix, None) ]
         extension = h.rom_extension
-        (ext, not_ext) = partition(lambda x: x[1].rom_extension == extension, candidates)
-        #since to get here we already matched and froze or didn't match and froze 
-        #all the candidates with equal urls+h._rom, counting even different extensions
-        #(ie: removed or fixed cds with significant names and filenames), inplace modification is fine
+        (ext, not_ext) = partition(lambda x: x[1].rom_extension == extension, not_frozen)
+
+        matches = [ (ix,x) for ix,x in not_frozen if x._crc == h._crc ]
+        error = "warn: '{}', {} extra matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
+        match_one_if_available(matches, error, index, h)
+
+        ext = list(ext)
+        error = "warn: '{}', {} extra urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
+        match_one_if_available(ext, error, index, h)
+
+        #replace on other rom fileformats even if we don't have a match besides urls
+        #this is fine because the assignments this hack could conflict with are frozen
+        #(the filename group match and the same crc checks above). 
+        #TODO Version could conflict if a version update happens and the user don't 
+        #bother to have rom scans for those hacks. Unfortunately the parser can't 
+        #handle versions to ignore them.
         for i2, h2 in not_ext:
             if not frozen(i2, h2):
                 for ncom in h._comments:
@@ -502,14 +524,6 @@ def filter_hacks(hacks, merge_hacks):
                 filename_minus_extension = ''.join(h._rom.rsplit(extension))
                 h2._rom = filename_minus_extension + h2.rom_extension
 
-        #regardless of extension, match crc, then match extension. Present errors both times
-        matches = [ (ix,x) for ix,x in candidates if x._crc == h._crc ]
-        ext = list(ext)
-        error = "'{}', {} matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
-        one_cardinality(matches, error, index, h)
-        error = "'{}', {} urls+extension matches after full filename (multi-cd) filtering".format(h._name, len(ext))
-        one_cardinality(ext, error, index, h)
-
     for i,x in reversed(list(enumerate(hacks))):
         if x == delete_marker:
             del hacks[i]
@@ -520,10 +534,10 @@ def filter_hacks(hacks, merge_hacks):
         l = len(diffs)
         lstr = ( str(l)+' ' ) if l > 1 else ''
         lsuffix = '' if l == 1 else 's'
-        print('warn: {}merge-file hack{} overriden:'.format(lstr, lsuffix), file=sys.stderr, end='')
+        warn('warn: {}merge-file hack{} overriden:'.format(lstr, lsuffix), end='')
         for value in diffs:
-            print(value, file=sys.stderr, end='')
-        print('',file=sys.stderr)
+            nc_warn(value, end='')
+        nc_warn('')
 
 def write_to_file(file, hacks, merge_dat):
     if merge_dat:
@@ -568,7 +582,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
             if not os.path.isfile(possible_metadata):
                 if patches:
-                    print("warn: '{}' : has patches without a version file".format(rom), file=sys.stderr)
+                    warn("warn: '{}' : has patches without a version file".format(rom))
                 continue
 
             try:
@@ -581,7 +595,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if not patches:
                     if unknown_remove:
                         raise ScriptError('no patches and a version file, hardpatch possible, but -i given')
-                    print("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom), file=sys.stderr)
+                    warn("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom))
                     softpatch = False
 
                 if len(patches) > 1:
@@ -591,7 +605,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     patch = patches[0]
 
                 if DEBUG:
-                    hack = Hack.fromRhdnet(metadata,language,"BOGUS",rom,0,''.zfill(8),''.zfill(32),''.zfill(40))
+                    hack = Hack.fromRhdnet(metadata,language,rom,rom,0,''.zfill(8),''.zfill(32),''.zfill(40))
                     hacks.append(hack)
                     continue
 
@@ -624,7 +638,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     if unknown_remove and not rom_title:
                         raise ScriptError("crc32 '{}' not found in dat".format(dat_crc32))
                     elif not rom_title:
-                        print("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32), file=sys.stderr)
+                        warn("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32))
 
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 checksums_generator = get_checksums()
@@ -637,7 +651,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                 hacks.append(hack)
             except ScriptError as e: #let the default stop execution and print on other errors
-                print("skip: '{}' : {}".format(rom, e), file=sys.stderr)
+                log("skip: '{}' : {}".format(rom, e))
                 continue
 
     if output_file:
@@ -678,7 +692,7 @@ def main():
     flips = which('flips')
     xdelta = which('xdelta3')
     if not (flips and xdelta):
-        print('error: rhdndat needs xdelta3 and flips on the path or script dir', file=sys.stderr)
+        error('error: rhdndat needs xdelta3 and flips on the path or script dir')
         return 1
 
     if args.t:
@@ -690,10 +704,10 @@ def main():
         dat = None if not args.m else hack_dat(args.m)
         make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
     except ParseException as e: #fail early for parsing this to prevent data loss
-        print("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e), file=sys.stderr)
+        error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
         return 1
     except InternetFatalError as e:
-        print('error: {}'.format(e), file=sys.stderr)
+        error('error: {}'.format(e))
         return 1
 
 if __name__ == '__main__':
