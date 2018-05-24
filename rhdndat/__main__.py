@@ -458,8 +458,6 @@ def filter_hacks(hacks, merge_hacks):
             for iy,y in lst:
                 warn('\u2022 ' + y._name)
 
-    clone_hacks = list(hacks)
-
     for index, h in enumerate(hacks):
 
         if h == delete_marker:
