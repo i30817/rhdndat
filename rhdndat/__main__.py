@@ -385,7 +385,7 @@ def get_romhacking_data(rom, possible_metadata):
               warn("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version))
         return (metadata, language)
     except Exception as e: #all exceptions (except the version file ones)
-        raise InternetFatalError('rhdndata requires a active internet connection', e)
+        raise InternetFatalError("'{}' rhdndata requires a active internet connection".format(rom), e)
 
 def get_dat_rom_name(dat, dat_crc32):
     dat_rom = dat.find('rom', crc=dat_crc32)
