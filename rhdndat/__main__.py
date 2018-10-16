@@ -52,10 +52,10 @@ class InternetFatalError(Exception):
 '''wrapper class for the retroarch hack dat files'''
 class Hack():
 
-    def __init__(self, name, description, comments, rom, size, crc, md5, sha1):
+    def __init__(self, name, description, patches, rom, size, crc, md5, sha1):
         self._name = name
         self._description = description
-        self._comments = comments
+        self._patches = patches
         self._rom = rom
         self._size = size
         self._crc = crc
@@ -84,18 +84,18 @@ class Hack():
         count_hacks = 0
 
         #hacks have no language, translations always do
-        comments = []
+        patches = []
         description = ''
         count = False
         for title, author, version, url in metadata_tuples:
-            comments.append(url)
+            patches.append(url)
             if Hack.is_rhdn_translation(url):
                 description += '{}{} translation by {} version ({})'.format(' + ' if count else '', language, author, version)
                 count_translations = count_translations + 1
                 last_translation = title
                 last_translation_author = author
             elif Hack.is_rhdn_hack(url):
-                description += '{}{} hack by {} version ({})'.format(' + ' if count else '', title, author, version)
+                description += '{}{} by {} version ({})'.format(' + ' if count else '', title, author, version)
                 count_hacks = count_hacks + 1
                 if not first_hack:
                     first_hack = title
@@ -128,7 +128,7 @@ class Hack():
 
         combined_title = '{} {}'.format(main_title, title_suffix)
 
-        return cls(combined_title, description, comments, rom, size, crc, md5, sha1)
+        return cls(combined_title, description, patches, rom, size, crc, md5, sha1)
 
     @staticmethod
     def is_rhdn_translation(url_str):
@@ -159,16 +159,16 @@ class Hack():
             return self._paths
 
         self._paths = []
-        for com in self._comments:
+        for com in self._patches:
             loc = Hack.get_rhdn_url(com)
             if loc:
                 self._paths.append(loc.path)
         return self._paths
 
     def __str__(self):
-        comments = ''
-        for com in self._comments:
-            comments += '\n    comment "{}"'.format(com)
+        patches = ''
+        for com in self._patches:
+            patches += '\n    patch "{}"'.format(com)
 
         return '''
 game (
@@ -176,7 +176,7 @@ game (
     description "{}"
     rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
 )'''.format(self._name, self._description,
-            self._rom, self._size, self._crc, self._md5, self._sha1, comments)
+            self._rom, self._size, self._crc, self._md5, self._sha1, patches)
 
 def hack_entry():
     '''clrmamepro ra hacks entries parser'''
@@ -197,17 +197,17 @@ def hack_entry():
                     Suppress(Keyword('md5'))  + md5.setResultsName('md5')         + \
                     Suppress(Keyword('sha1')) + sha1.setResultsName('sha1')
 
-    comments = ZeroOrMore(Suppress(Keyword('comment')) + quotes.copy())
+    patches = ZeroOrMore(Suppress(Keyword('patch')) + quotes.copy())
 
     a= Suppress(Keyword('name'))        + quotes.copy().setResultsName('name')        + \
        Suppress(Keyword('description')) + quotes.copy().setResultsName('description') + \
        Suppress(Keyword('rom'))                                                       + \
        nestedExpr(content=rom_data).setResultsName('rom')                             + \
-       comments.setResultsName('comments')
+       patches.setResultsName('patches')
 
     def replace(token):
         rom = token.rom[0] #rom is a nestedExpr
-        return Hack(token.name, token.description, token.comments,
+        return Hack(token.name, token.description, token.patches,
             rom.filename, rom.size, rom.crc, rom.md5, rom.sha1)
 
     a.setParseAction(replace)
@@ -522,11 +522,11 @@ def filter_hacks(hacks, merge_hacks):
             h2._description = h._description
             filename_minus_extension = ''.join(h._rom.rsplit(extension))
             h2._rom = filename_minus_extension + h2.rom_extension
-            for ncom in h._comments:
+            for ncom in h._patches:
                 if Hack.get_rhdn_url(ncom):
-                    for (i, ocom) in enumerate(h2._comments):
+                    for (i, ocom) in enumerate(h2._patches):
                         if Hack.get_rhdn_url(ocom):
-                            h2._comments[i] = ncom
+                            h2._patches[i] = ncom
 
     for i,x in reversed(list(enumerate(hacks))):
         if x == delete_marker:
