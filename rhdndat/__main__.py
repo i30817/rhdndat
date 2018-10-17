@@ -52,10 +52,11 @@ class InternetFatalError(Exception):
 '''wrapper class for the retroarch hack dat files'''
 class Hack():
 
-    def __init__(self, name, description, patches, rom, size, crc, md5, sha1):
+    def __init__(self, name, description, patches, comments, rom, size, crc, md5, sha1):
         self._name = name
         self._description = description
         self._patches = patches
+        self._comments = comments
         self._rom = rom
         self._size = size
         self._crc = crc
@@ -128,7 +129,7 @@ class Hack():
 
         combined_title = '{} {}'.format(main_title, title_suffix)
 
-        return cls(combined_title, description, patches, rom, size, crc, md5, sha1)
+        return cls(combined_title, description, patches, [], rom, size, crc, md5, sha1)
 
     @staticmethod
     def is_rhdn_translation(url_str):
@@ -167,16 +168,19 @@ class Hack():
 
     def __str__(self):
         patches = ''
-        for com in self._patches:
-            patches += '\n    patch "{}"'.format(com)
+        comments = ''
+        for pat in self._patches:
+            patches += '\n    patch "{}"'.format(pat)
+        for com in self._comments:
+            comments += '\n    comment "{}"'.format(com)
 
         return '''
 game (
     name "{}"
     description "{}"
-    rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}
+    rom ( name "{}" size {} crc {} md5 {} sha1 {} ){}{}
 )'''.format(self._name, self._description,
-            self._rom, self._size, self._crc, self._md5, self._sha1, patches)
+            self._rom, self._size, self._crc, self._md5, self._sha1, patches, comments)
 
 def hack_entry():
     '''clrmamepro ra hacks entries parser'''
@@ -198,16 +202,18 @@ def hack_entry():
                     Suppress(Keyword('sha1')) + sha1.setResultsName('sha1')
 
     patches = ZeroOrMore(Suppress(Keyword('patch')) + quotes.copy())
+    comments = ZeroOrMore(Suppress(Keyword('comment')) + quotes.copy())
 
     a= Suppress(Keyword('name'))        + quotes.copy().setResultsName('name')        + \
        Suppress(Keyword('description')) + quotes.copy().setResultsName('description') + \
        Suppress(Keyword('rom'))                                                       + \
        nestedExpr(content=rom_data).setResultsName('rom')                             + \
-       patches.setResultsName('patches')
+       patches.setResultsName('patches')                                              + \
+       comments.setResultsName('comments')
 
     def replace(token):
         rom = token.rom[0] #rom is a nestedExpr
-        return Hack(token.name, token.description, token.patches,
+        return Hack(token.name, token.description, token.patches, token.comments,
             rom.filename, rom.size, rom.crc, rom.md5, rom.sha1)
 
     a.setParseAction(replace)
