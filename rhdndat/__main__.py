@@ -360,6 +360,15 @@ def get_romhacking_data(rom, possible_metadata):
         for (version, url) in version_hacks:
             page = urllib.request.urlopen(url).read()
             soup = BeautifulSoup(page, 'lxml')
+
+            #removed hacks from romhacking.net can be bad news, broken or malicious hacks
+            #warn the user to verify if he might have to remove the hack from the merge file
+            check_removed = soup.find('div', id='main')
+            if check_removed:
+                check_removed = check_removed.find('div', class_='topbar', string='RHDN Error Encountered!')
+                if check_removed:
+                    raise NonFatalError("'{}' was removed from romhacking.net, check dats to delete previous versions".format(url))
+
             info = soup.find('table', class_='entryinfo entryinfosmall').find('tbody')
 
             #hacks have no language
@@ -390,7 +399,7 @@ def get_romhacking_data(rom, possible_metadata):
             if remote_version and remote_version != version:
               warn("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version))
         return (metadata, language)
-    except Exception as e: #all exceptions (except the version file ones)
+    except urllib.error.URLError as e:
         raise InternetFatalError("'{}' rhdndata requires a active internet connection".format(rom), e)
 
 def get_dat_rom_name(dat, dat_crc32):
