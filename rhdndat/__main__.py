@@ -605,23 +605,20 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 continue
 
             try:
-                (metadata, language) = get_romhacking_data(rom, possible_metadata)
-
-                if test_versions_only:
-                    continue
-
-                softpatch = True
+                patch = None
                 if not patches:
                     if unknown_remove:
                         raise NonFatalError('no patches and a version file, hardpatch possible, but -i given')
                     warn("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom))
-                    softpatch = False
+                    patch = patches[0]
 
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                if softpatch:
-                    patch = patches[0]
+                (metadata, language) = get_romhacking_data(rom, possible_metadata)
+
+                if test_versions_only:
+                    continue
 
                 if DEBUG:
                     hack = Hack.fromRhdnet(metadata,language,rom,rom,0,''.zfill(8),''.zfill(32),''.zfill(40))
@@ -630,7 +627,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 #if using dat file for name, find the rom on dat
                 rom_title = None
-                if dat and softpatch:
+                if dat and patch:
                     dat_crc32 = None
                     if skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
                         #bps roms have 12 bytes footers with the source, destination and patch crc32s
@@ -662,7 +659,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 checksums_generator = get_checksums()
                 #hardpatch
-                if not softpatch or patch.endswith('.reset.xdelta'):
+                if not patch or patch.endswith('.reset.xdelta'):
                     (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
                 else:
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
