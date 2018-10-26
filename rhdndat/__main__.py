@@ -605,15 +605,14 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 continue
 
             try:
-                patch = None
-                if not patches:
-                    if unknown_remove:
-                        raise NonFatalError('no patches and a version file, hardpatch possible, but -i given')
-                    warn("warn: '{}' : no patches and a version file, assume a hardpatch without reset".format(rom))
-                    patch = patches[0]
-
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
+
+                patch = patches[0] or None
+                if not patch:
+                    if unknown_remove:
+                        raise NonFatalError('no patch and a version file, hardpatch possible, but -i given')
+                    warn("warn: '{}' : no patch and a version file, assume a hardpatch without reset".format(rom))
 
                 (metadata, language) = get_romhacking_data(rom, possible_metadata)
 
@@ -648,6 +647,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         else:
                             dat_crc32 =  file_producer(absolute_rom, crc32_generator)
                         rom_title = get_dat_rom_name(dat, dat_crc32.upper())
+
                         if not rom_title:
                              rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
@@ -684,7 +684,7 @@ def parse_args():
         return r_in
     def searchpath_is_dir(p_in):
         if not os.path.isdir(p_in):
-            raise argparse.ArgumentTypeError("must be a dir")
+            raise argparse.ArgumentTypeError("'{}' must be a dir".format(p_in))
         return p_in
     types = argparse.RawTextHelpFormatter
     parser = argparse.ArgumentParser(description=desc_with_version, formatter_class=types)
