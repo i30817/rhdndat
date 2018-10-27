@@ -608,11 +608,13 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                patch = patches[0] or None
-                if not patch:
+                if patches:
+                    patch = patches[0]
+                else:
                     if unknown_remove:
                         raise NonFatalError('no patch and a version file, hardpatch possible, but -i given')
                     warn("warn: '{}' : no patch and a version file, assume a hardpatch without reset".format(rom))
+                    patch = None
 
                 (metadata, language) = get_romhacking_data(rom, possible_metadata)
 
