@@ -712,12 +712,13 @@ def main():
     if not (flips and xdelta):
         error('error: rhdndat needs xdelta3 and flips on the path or script dir')
         return 1
+    if args.i and not args.d:
+        error("error: -i option requires -d option to whitelist roms on the dat")
+        return 1
+    if args.t and (args.o or args.m or args.d or args.i):
+        error("error: -t option can't be used with other options")
+        return 1
 
-    if args.t:
-        args.o = None
-        args.m = None
-        args.d = None
-        args.i = False
     try:
         dat = None if not args.m else hack_dat(args.m)
         make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
