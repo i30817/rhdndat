@@ -598,11 +598,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
             patches = [ x for x in possible_patches if os.path.isfile(x) ]
             possible_metadata = os.path.join(dirpath,'version')
-
-            if not os.path.isfile(possible_metadata):
-                if patches:
-                    warn("warn: '{}' : has patches without a version file".format(rom))
-                continue
+            no_metadata = not os.path.isfile(possible_metadata)
 
             try:
                 if len(patches) > 1:
@@ -610,11 +606,15 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 patch = None
                 if patches:
+                    if no_metadata:
+                        warn("warn: '{}' : has patch without a version file".format(rom))
+                        continue
                     patch = patches[0]
                 else:
-                    if unknown_remove or test_versions_only:
+                    if unknown_remove or no_metadata:
                         continue
-                    warn("warn: '{}' : no patch and a version file, assume a hardpatch".format(rom))
+                    if not test_versions_only:
+                        warn("warn: '{}' : no patch and a version file, assume a hardpatch".format(rom))
 
                 (metadata, language) = get_romhacking_data(rom, possible_metadata)
 
