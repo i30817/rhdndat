@@ -73,13 +73,11 @@ have a romhacking.net hack page, requires -d
 desc_ignore = textwrap.dedent(desc_ignore)
 
 desc_xattr ='''\
-for all roms, store patched user.rom.md5, user.rom.crc32
-and user.rom.sha1 as extended attributes in the rom file,
-ignores -o, -m, -d, -i or -t, requires nothing but a rom
-
-retroarch scanner supports these entries as checksums,
-which speeds up playlist creation and allows softpatched
-roms to present correct metadata
+for all roms, store patched user.rom.md5, user.rom.crc32 and
+user.rom.sha1 as extended attributes in the rom file, ignores
+-o, -m, -d, -i or -t, requires nothing but a rom but if a
+patch of the same name exists, it'll consider it a softpatch
+and record the checksums as if the patch was applied
 
 '''
 desc_xattr = textwrap.dedent(desc_xattr)
