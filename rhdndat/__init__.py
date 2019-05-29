@@ -57,25 +57,25 @@ romhacking urls as the older entry
 desc_merge = textwrap.dedent(desc_merge)
 
 desc_xml ='''\
-forces to pick up the translations game names from the rom 
-checksum in this file, if checksum not in xml, the program 
-picks names from hack page 
+picks up the game names from from this cmpro .xml and the
+rom checksum (including if a revert patch is available),
+if no entry is found the program picks names from the
+romhacking.net hack page
 
 '''
 desc_xml = textwrap.dedent(desc_xml)
 
 desc_ignore ='''\
 don\'t allow unrecognized roms to be added even if the patches
-have a romhacking.net page, prevents (rom,version) without
-patch from being added as hardpatches
+have a romhacking.net hack page, requires -d
 
 '''
 desc_ignore = textwrap.dedent(desc_ignore)
 
 desc_xattr ='''\
-in posix filesystems, store calculated user.rhdndat.md5,
-user.rhdndat.crc32 and user.rhdndat.sha1 as extended
-attributes in the rom file
+for all roms, store patched user.rom.md5, user.rom.crc32
+and user.rom.sha1 as extended attributes in the rom file,
+ignores -o, -m, -d, -i or -t, requires nothing but a rom
 
 retroarch scanner supports these entries as checksums,
 which speeds up playlist creation and allows softpatched
@@ -86,7 +86,7 @@ desc_xattr = textwrap.dedent(desc_xattr)
 
 desc_check ='''\
 only test version numbers against remote version, 
-ignore -o, -m, -d, -i or -x, works without a patch present
+ignores -o, -m, -d, -i or -x, works without a patch present
 '''
 desc_check = textwrap.dedent(desc_check)
 
