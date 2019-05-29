@@ -140,7 +140,10 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['beautifulsoup4', 'lxml', 'pyparsing', 'colorama'],
+    install_requires=['beautifulsoup4', 'lxml', 'pyparsing', 'colorama', \
+        'xattr; "linux" in sys_platform or \
+        "freebsd" in sys_platform or \
+        "darwin" in sys_platform '],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
@@ -151,15 +154,6 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
-        ':"darwin" in sys_platform': [
-            'xattr'
-        ],
-        ':"linux" in sys_platform': [
-            'xattr'
-        ],
-        ':"freebsd" in sys_platform': [
-            'xattr'
-        ],
         'dev': ['check-manifest'],
         'test': ['coverage'],
     },
