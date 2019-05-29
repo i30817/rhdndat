@@ -50,9 +50,6 @@ optional arguments:
                   
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
-                  
-  -t              only test version numbers against remote version, 
-                  ignore -o, -d, -i or -x, works without a patch present
 
   -x              for all roms, store patched user.rom.md5, user.rom.crc32
                   and user.rom.sha1 as extended attributes in the rom file,
@@ -61,6 +58,9 @@ optional arguments:
                   retroarch scanner supports these entries as checksums,
                   which speeds up playlist creation and allows softpatched
                   roms to present correct metadata
+                  
+  -t              only test version numbers against remote version, 
+                  ignore -o, -d, -i or -x, works without a patch present
 
 Memory Requirements
 -------------------
