@@ -605,17 +605,22 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
             metadata_exists = os.path.isfile(possible_metadata)
 
             try:
+                #force user to fix this
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
                 if test_versions_only and metadata_exists:
                     get_romhacking_data(rom, possible_metadata)
                     continue
-                #store_xattr is exclusive and it continues later if triggered, so this catches
-                #the only problematic case (metadata_exists = false and store_xattr = false)
+
+                #always warn about this if not testing versions
+                if not metadata_exists and patches:
+                    warn("warn: '{}' : has patch without a version file".format(rom))
+                elif metadata_exists:
+                    warn("warn: '{}' : no patch and a version file, assume a hardpatch".format(rom))
+
+                #skip work if metadata does not exist and we do not want to store xattr
                 if not metadata_exists and not store_xattr:
-                    if patches:
-                        warn("warn: '{}' : has patch without a version file".format(rom))
                     continue
 
                 if DEBUG and metadata_exists:
@@ -627,9 +632,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 patch = None
                 if patches:
                     patch = patches[0]
-                elif metadata_exists:
-                    warn("warn: '{}' : no patch and a version file, assume a hardpatch".format(rom))
-
                 #find the rom title on dat, only if there is a patch to add to the hack list
                 rom_title = None
                 if dat and patch:
@@ -675,13 +677,12 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     attr['user.rom.crc32'] = crc.encode('ascii')
                     attr['user.rom.md5'] = md5.encode('ascii')
                     attr['user.rom.sha1'] = sha1.encode('ascii')
-                    continue
 
-                (metadata, language) = get_romhacking_data(rom, possible_metadata)
-
-                #we don't process this now for merge-dat to work
-                hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
-                hacks.append(hack)
+                if metadata_exists:
+                    (metadata, language) = get_romhacking_data(rom, possible_metadata)
+                    #we don't process this now for merge-dat to work
+                    hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
+                    hacks.append(hack)
             except NonFatalError as e: #let the default stop execution and print on other errors
                 log("skip: '{}' : {}".format(rom, e))
                 continue
@@ -734,9 +735,6 @@ def main():
         return 1
     if args.t and (args.o or args.m or args.d or args.i or args.x):
         error("error: -t option can't be used with other options")
-        return 1
-    if args.x and (args.o or args.m or args.d or args.i or args.t):
-        error("error: -x option can't be used with other options")
         return 1
 
     try:

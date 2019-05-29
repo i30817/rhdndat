@@ -58,7 +58,7 @@ optional arguments:
                   the checksums as if the patch was applied
 
   -t              only test version numbers against remote version,
-                  works without a patch present
+                  works without a patch present, exclusive option
 
 Memory Requirements
 -------------------

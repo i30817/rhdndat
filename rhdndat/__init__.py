@@ -1,4 +1,4 @@
-__version__ = '1.4.3'
+__version__ = '1.4.4'
 
 import textwrap
 
@@ -84,7 +84,7 @@ desc_xattr = textwrap.dedent(desc_xattr)
 
 desc_check ='''\
 only test version numbers against remote version,
-works without a patch present
+works without a patch present, exclusive option
 '''
 desc_check = textwrap.dedent(desc_check)
 
