@@ -25,7 +25,7 @@ Arguments:
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
-                
+
                     if there is no (rom, romfilename patch) pair but a patch of 
                     the form 'romfilename.reset.xdelta' is found, rom is treated
                     as a hardpatched rom, -d will search for the checksum of the
@@ -47,7 +47,7 @@ optional arguments:
                   rom checksum (including if a revert patch is available),
                   if no entry is found the program picks names from the
                   romhacking.net hack page
-                  
+
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
 
@@ -58,7 +58,7 @@ optional arguments:
                   retroarch scanner supports these entries as checksums,
                   which speeds up playlist creation and allows softpatched
                   roms to present correct metadata
-                  
+
   -t              only test version numbers against remote version, 
                   ignore -o, -d, -i or -x, works without a patch present
 
