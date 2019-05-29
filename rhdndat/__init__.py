@@ -1,4 +1,4 @@
-__version__ = '1.4.2'
+__version__ = '1.4.3'
 
 import textwrap
 
@@ -74,17 +74,17 @@ desc_ignore = textwrap.dedent(desc_ignore)
 
 desc_xattr ='''\
 for all roms, store user.rom.md5, user.rom.crc32 and
-user.rom.sha1 as extended attributes in the rom file, ignores
--o, -m, -d, -i or -t, requires nothing but a rom but if a
-patch of the same name exists, it'll consider it a softpatch
-and record the checksums as if the patch was applied
+user.rom.sha1 as extended attributes in the rom file,
+requires nothing but a rom but if a patch of the same
+name exists, it'll consider it a softpatch and record
+the checksums as if the patch was applied
 
 '''
 desc_xattr = textwrap.dedent(desc_xattr)
 
 desc_check ='''\
-only test version numbers against remote version, 
-ignores -o, -m, -d, -i or -x, works without a patch present
+only test version numbers against remote version,
+works without a patch present
 '''
 desc_check = textwrap.dedent(desc_check)
 

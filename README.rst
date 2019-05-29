@@ -52,13 +52,13 @@ optional arguments:
                   have a romhacking.net hack page, requires -d
 
   -x              for all roms, store user.rom.md5, user.rom.crc32 and
-                  user.rom.sha1 as extended attributes in the rom file, ignores
-                  -o, -m, -d, -i or -t, requires nothing but a rom but if a
-                  patch of the same name exists, it'll consider it a softpatch
-                  and record the checksums as if the patch was applied
+                  user.rom.sha1 as extended attributes in the rom file,
+                  requires nothing but a rom but if a patch of the same
+                  name exists, it'll consider it a softpatch and record
+                  the checksums as if the patch was applied
 
-  -t              only test version numbers against remote version, 
-                  ignore -o, -d, -i or -x, works without a patch present
+  -t              only test version numbers against remote version,
+                  works without a patch present
 
 Memory Requirements
 -------------------
