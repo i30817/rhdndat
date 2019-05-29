@@ -97,7 +97,9 @@ setup(
         #   5 - Production/Stable
         'Development Status :: 3 - Alpha',
 
+        'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
+        'Operating System :: POSIX :: BSD :: FreeBSD',
         'Operating System :: Microsoft :: Windows',
 
         'Environment :: Console',
@@ -149,6 +151,15 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
+        ':"darwin" in sys_platform': [
+            'xattr'
+        ],
+        ':"linux" in sys_platform': [
+            'xattr'
+        ],
+        ':"freebsd" in sys_platform': [
+            'xattr'
+        ],
         'dev': ['check-manifest'],
         'test': ['coverage'],
     },

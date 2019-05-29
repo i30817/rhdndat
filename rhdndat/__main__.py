@@ -20,6 +20,10 @@ except Exception as e:
     print(libraries_error, file=sys.stderr)
     sys.exit(1)
 
+xattr_available = importlib.util.find_spec('xattr') is not None
+if xattr_available:
+    from xattr import xattr
+
 from bs4 import BeautifulSoup
 from pyparsing import *
 from colorama import Fore, Back, Style, init
@@ -570,7 +574,7 @@ def write_to_file(file, hacks, merge_dat):
     for hack in hacks:
         file.write(str(hack))
 
-def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
+def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, store_xattr):
     skip_bytes = 0
     dat = None
     if dat_file:
@@ -665,6 +669,13 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
                 else:
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
+
+                if store_xattr:
+                    attr = xattr(absolute_rom)
+                    attr.setxattr('user.rhdndat.crc32', crc)
+                    attr.setxattr('user.rhdndat.md5', md5)
+                    attr.setxattr('user.rhdndat.sha1', sha1)
+
                 #we don't process this now for merge-dat to work
                 hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                 hacks.append(hack)
@@ -697,6 +708,10 @@ def parse_args():
     parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
     parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
     parser.add_argument('-i', action='store_true', help=desc_ignore)
+    if xattr_available:
+        parser.add_argument('-x', action='store_true', help=desc_xattr)
+    else:
+        parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
     parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
@@ -715,13 +730,13 @@ def main():
     if args.i and not args.d:
         error("error: -i option requires -d option to whitelist roms on the dat")
         return 1
-    if args.t and (args.o or args.m or args.d or args.i):
+    if args.t and (args.o or args.m or args.d or args.i or args.x):
         error("error: -t option can't be used with other options")
         return 1
 
     try:
         dat = None if not args.m else hack_dat(args.m)
-        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
+        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x)
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
         return 1

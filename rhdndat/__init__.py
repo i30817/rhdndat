@@ -1,11 +1,11 @@
-__version__ = '1.3.6'
+__version__ = '1.4.0'
 
 import textwrap
 
 libraries_error ='''\
 Please install required libraries. You can install the most recent version with:
 
-\tpip3 install --user beautifulsoup4 lxml pyparsing colorama'''
+\tpip3 install --user beautifulsoup4 lxml pyparsing colorama xattr'''
 
 desc_with_version ='''\
 rhdndat {} : www.romhacking.net dat creator 
@@ -72,12 +72,23 @@ patch from being added as hardpatches
 '''
 desc_ignore = textwrap.dedent(desc_ignore)
 
+desc_xattr ='''\
+in posix filesystems, store calculated user.rhdndat.md5,
+user.rhdndat.crc32 and user.rhdndat.sha1 as extended
+attributes in the rom file
+
+retroarch scanner supports these entries as checksums,
+which speeds up playlist creation and allows softpatched
+roms to present correct metadata
+
+'''
+desc_xattr = textwrap.dedent(desc_xattr)
+
 desc_check ='''\
 only test version numbers against remote version, 
-ignore -o, -m, -d or -i, works without a patch present
+ignore -o, -m, -d, -i or -x, works without a patch present
 '''
 desc_check = textwrap.dedent(desc_check)
-
 
 languages = [
     ('aa', 'Afar'), ('ab', 'Abkhazian'), ('af', 'Afrikaans'), ('ak', 'Akan'),

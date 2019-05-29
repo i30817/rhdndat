@@ -21,7 +21,7 @@ Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work 
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-x] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -53,6 +53,14 @@ optional arguments:
                   
   -t              only test version numbers against remote version, 
                   ignore -o, -d or -i, works without a patch present
+
+  -x              in posix filesystems, store calculated user.rhdndat.md5,
+                  user.rhdndat.crc32 and user.rhdndat.sha1 as extended
+                  attributes in the rom file
+
+                  retroarch scanner supports these entries as checksums,
+                  which speeds up playlist creation and allows softpatched
+                  roms to present correct metadata
 
 Memory Requirements
 -------------------
