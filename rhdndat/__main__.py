@@ -609,18 +609,22 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                if test_versions_only and xattr_available: #only be this noisy on the 'test' flag
-                    x = xattr.xattr(absolute_rom)
-                    if not 'user.rom.crc32' in x or not 'user.rom.md5' in x or not 'user.rom.sha1' in x:
-                        log('info: {} : run with -x once to set rom xattr'.format(rom))
-
                 if test_versions_only and metadata_exists:
                     get_romhacking_data(rom, possible_metadata)
                     continue
 
-                #skip work if metadata does not exist and we do not want to store xattr
-                if not xattr_available and not metadata_exists:
-                    continue
+                #when a version file exists, this shortcut is disabled, which means the 
+                #checksums will be regenerated on files of directories with patches only
+                #and assumed not not to 'change' on directories without, which might be flawed
+                if not metadata_exists: 
+                    if not xattr_available:
+                        continue
+                    else:
+                        x = xattr.xattr(absolute_rom)
+                        if 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x:
+                            continue
+                        else:
+                            log('info: {} : calculating checksums for xattr'.format(rom))
 
                 if DEBUG and metadata_exists:
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
