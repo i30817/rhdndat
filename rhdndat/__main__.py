@@ -614,8 +614,12 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     continue
 
                 #skip work if metadata does not exist and we do not want to store xattr
-                if not metadata_exists and not store_xattr:
-                    continue
+                if not store_xattr:
+                    #but still show the files without them
+                    if xattr.xattr(absolute_rom)['user.rom.crc32'] == None:
+                        log('info: {} run with -x once to set rom xattr'.format(rom))
+                    if not metadata_exists:
+                        continue
 
                 if DEBUG and metadata_exists:
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
