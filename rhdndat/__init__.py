@@ -1,4 +1,4 @@
-__version__ = '1.4.10'
+__version__ = '1.4.12'
 
 import textwrap
 
@@ -25,6 +25,14 @@ the file will be assumed to be hardpatched, which can be avoided by passing -i.
 version file is simply named 'version' and has a version number line followed 
 by a romhacking.net url line, repeated. These correspond to each hack or 
 translation on the softpatch.
+
+During normal operation, for all roms rhdndat stores extended attributes
+user.rom.md5, user.rom.crc32 and user.rom.sha1 in the rom file, and these
+checksums refer to the 'patched' file, even if the patch is a softpatch.
+
+The hope is that this will be supported by scanning tools like retroarch scanner
+in order to make it much more friendly to scan non-zip filesystems as well as
+solve some problems with softpatching and checksum databases.
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
 with xdelta) on path or the same directory.'''
@@ -71,16 +79,6 @@ have a romhacking.net hack page, requires -d
 
 '''
 desc_ignore = textwrap.dedent(desc_ignore)
-
-desc_xattr ='''\
-for all roms, store user.rom.md5, user.rom.crc32 and
-user.rom.sha1 as extended attributes in the rom file,
-requires nothing but a rom but if a patch of the same
-name exists, it'll consider it a softpatch and record
-the checksums as if the patch was applied
-
-'''
-desc_xattr = textwrap.dedent(desc_xattr)
 
 desc_check ='''\
 only test version numbers against remote version,

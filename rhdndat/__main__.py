@@ -574,7 +574,7 @@ def write_to_file(file, hacks, merge_dat):
     for hack in hacks:
         file.write(str(hack))
 
-def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, store_xattr):
+def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
     skip_bytes = 0
     dat = None
     if dat_file:
@@ -609,8 +609,9 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                if test_versions_only: #only be this noisy on the 'test' flag
-                    if not 'user.rom.crc32' in xattr.xattr(absolute_rom):
+                if test_versions_only and xattr_available: #only be this noisy on the 'test' flag
+                    x = xattr.xattr(absolute_rom)
+                    if not 'user.rom.crc32' in x or not 'user.rom.md5' in x or not 'user.rom.sha1' in x:
                         log('info: {} : run with -x once to set rom xattr'.format(rom))
 
                 if test_versions_only and metadata_exists:
@@ -618,7 +619,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     continue
 
                 #skip work if metadata does not exist and we do not want to store xattr
-                if not store_xattr and not metadata_exists:
+                if not xattr_available and not metadata_exists:
                     continue
 
                 if DEBUG and metadata_exists:
@@ -639,6 +640,13 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
                 else: #possible hardpatch (with reset or not) or just normal file of the right type
                     (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
+
+                #always store, since we already need to calculate it anyway
+                if xattr_available:
+                    attr = xattr.xattr(absolute_rom)
+                    attr['user.rom.crc32'] = crc.encode('ascii')
+                    attr['user.rom.md5'] = md5.encode('ascii')
+                    attr['user.rom.sha1'] = sha1.encode('ascii')
 
                 ###find the original rom title on dat###
                 rom_title = None
@@ -668,12 +676,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                     if unknown_remove and not rom_title:
                         raise NonFatalError("crc32 '{}' not found in dat".format(dat_crc32))
-
-                if store_xattr:
-                    attr = xattr.xattr(absolute_rom)
-                    attr['user.rom.crc32'] = crc.encode('ascii')
-                    attr['user.rom.md5'] = md5.encode('ascii')
-                    attr['user.rom.sha1'] = sha1.encode('ascii')
 
                 if not metadata_exists and patch:
                     warn("warn: '{}' : has patch without a version file".format(rom))
@@ -717,10 +719,6 @@ def parse_args():
     parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
     parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
     parser.add_argument('-i', action='store_true', help=desc_ignore)
-    if xattr_available:
-        parser.add_argument('-x', action='store_true', help=desc_xattr)
-    else:
-        parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
     parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
@@ -744,7 +742,7 @@ def main():
 
     try:
         dat = None if not args.m else hack_dat(args.m)
-        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x)
+        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
         return 1

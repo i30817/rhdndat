@@ -16,12 +16,16 @@ If there is no patch file, but a version file exists, and the extension matches,
 
 version file is simply named ``version`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
 
+During normal operation, for all roms rhdndat stores extended attributes user.rom.md5, user.rom.crc32 and user.rom.sha1 in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch.
+
+The hope is that this will be supported by scanning tools like retroarch scanner in order to make it much more friendly to scan non-zip filesystems as well as solve some problems with softpatching false positives in the scanner.
+
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-x] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -50,12 +54,6 @@ optional arguments:
 
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
-
-  -x              for all roms, store user.rom.md5, user.rom.crc32 and
-                  user.rom.sha1 as extended attributes in the rom file,
-                  requires nothing but a rom but if a patch of the same
-                  name exists, it'll consider it a softpatch and record
-                  the checksums as if the patch was applied
 
   -t              only test version numbers against remote version,
                   works without a patch present, exclusive option
