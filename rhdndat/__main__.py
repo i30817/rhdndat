@@ -582,7 +582,7 @@ def write_to_file(file, hacks, merge_dat):
     for hack in hacks:
         file.write(str(hack))
 
-def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only):
+def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, forcexattr):
     skip_bytes = 0
     dat = None
     if dat_file:
@@ -624,15 +624,14 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 #when a version file exists, this shortcut is disabled, which means the 
                 #checksums will be regenerated on files of directories with patches only
                 #and assumed not not to 'change' on directories without, which might be flawed
-                if not metadata_exists: 
+                if not metadata_exists and not forcexattr: 
                     if not xattr_available:
                         continue
                     else:
                         x = xattr.xattr(absolute_rom)
                         if 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x:
                             continue
-                        else:
-                            log('info: {} : calculating checksums for xattr'.format(rom))
+                            
 
                 if DEBUG and metadata_exists:
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
@@ -659,6 +658,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     attr['user.rom.crc32'] = crc.encode('ascii')
                     attr['user.rom.md5'] = md5.encode('ascii')
                     attr['user.rom.sha1'] = sha1.encode('ascii')
+                    log('info: {} : stored checksums as extended attributes'.format(rom))
 
                 ###find the original rom title on dat###
                 rom_title = None
@@ -731,6 +731,10 @@ def parse_args():
     parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
     parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
     parser.add_argument('-i', action='store_true', help=desc_ignore)
+    if xattr_available:
+        parser.add_argument('-x', action='store_true', help=desc_forcexattr)
+    else:
+        parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
     parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
@@ -748,13 +752,13 @@ def main():
     if args.i and not args.d:
         error("error: -i option requires -d option to whitelist roms on the dat")
         return 1
-    if args.t and (args.o or args.m or args.d or args.i):
+    if args.t and (args.o or args.m or args.d or args.i or args.x):
         error("error: -t option can't be used with other options")
         return 1
 
     try:
         dat = None if not args.m else hack_dat(args.m)
-        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t)
+        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x)
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
         return 1

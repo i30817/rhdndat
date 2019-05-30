@@ -1,4 +1,4 @@
-__version__ = '1.4.14'
+__version__ = '1.4.15'
 
 import textwrap
 
@@ -79,6 +79,14 @@ have a romhacking.net hack page, requires -d
 
 '''
 desc_ignore = textwrap.dedent(desc_ignore)
+
+desc_forcexattr ='''\
+forces calculation of the extended attributes even to files
+with them and without a version file, for if you updated a
+rom file outside of the rhdndat system
+
+'''
+desc_forcexattr = textwrap.dedent(desc_forcexattr)
 
 desc_check ='''\
 only test version numbers against remote version,
