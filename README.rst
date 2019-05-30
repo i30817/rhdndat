@@ -25,7 +25,7 @@ Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work 
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-x] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -55,9 +55,9 @@ optional arguments:
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
 
-  -x              forces calculation of the extended attributes even to files
-                  with them and without a version file, for if you updated a
-                  rom file outside of the rhdndat system
+  -x              forces recalculation of the extended attributes even to files
+                  without a version file, for if you updated a rom file outside
+                  of the rhdndat system
 
   -t              only test version numbers against remote version,
                   works without a patch present, exclusive option
