@@ -188,14 +188,14 @@ game (
 
 def hack_entry():
     '''clrmamepro ra hacks entries parser'''
-    def always_leading_zero_in_crc(token):
-        return token[0].zfill(8)
+    def always_lowercase_leading_zero_in_crc(token):
+        return token[0].lower().zfill(8)
 
     quotes = quotedString()
     quotes.setParseAction(removeQuotes)
     size = Word(nums)
     #max and the action is to be permissive, even if no-intro isn't
-    crc = Word(hexnums, max=8).setParseAction(always_leading_zero_in_crc)
+    crc = Word(hexnums, max=8).setParseAction(always_lowercase_leading_zero_in_crc)
     md5 = Word(alphanums, exact=32)
     sha1 = Word(alphanums, exact=40)
 
@@ -613,12 +613,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     get_romhacking_data(rom, possible_metadata)
                     continue
 
-                #always warn about this if not testing versions
-                if not metadata_exists and patches:
-                    warn("warn: '{}' : has patch without a version file".format(rom))
-                elif metadata_exists:
-                    warn("warn: '{}' : no patch and a version file, assume a hardpatch".format(rom))
-
                 #skip work if metadata does not exist and we do not want to store xattr
                 if not metadata_exists and not store_xattr:
                     continue
@@ -632,11 +626,21 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 patch = None
                 if patches:
                     patch = patches[0]
-                #find the rom title on dat, only if there is a patch to add to the hack list
+
+                #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
+
+                ###find checksums of the 'final' patched file###
+                checksums_generator = get_checksums()
+                if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
+                    (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
+                else: #possible hardpatch (with reset or not) or just normal file of the right type
+                    (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
+
+                ###find the original rom title on dat###
                 rom_title = None
-                if dat and patch:
+                if dat:
                     dat_crc32 = None
-                    if skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
+                    if patch and skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
                         #bps roms have 12 bytes footers with the source, destination and patch crc32s
                         #unfortunately, this doesn't work if the dat we're working with skips headers
                         #(except for SNES headers, which is the one header bps ignores when creating/applying a patch)
@@ -645,32 +649,20 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                             p.seek(-12, os.SEEK_END)
                             dat_crc32 = '{:08x}'.format( struct.unpack('I', p.read(4))[0] )
 
-                        rom_title = get_dat_rom_name(dat, dat_crc32.upper())
-                        if not rom_title:
-                             rom_title = get_dat_rom_name(dat, dat_crc32.lower())
-                    else:
+                        rom_title = get_dat_rom_name(dat, dat_crc32.lower())
+                    elif skip_bytes == 0 and (not patch or patch.endswith('.reset.xdelta')): #reuse 'not a softpatch' value from above
+                        rom_title = get_dat_rom_name(dat, crc)
+                    else: #it's probably a softpatch or a very small hardpatch here
                         crc32_generator = get_crc32(skip_bytes)
-                        if patch.endswith('.reset.xdelta'): #it's a hardpatch
+                        if patch and patch.endswith('.reset.xdelta'): #it's a reversible hardpatch
                             dat_crc32 = patch_producer(patch, absolute_rom, crc32_generator)
-                        else:
+                        else:#either the original file or a irreversible hardpatch
                             dat_crc32 =  file_producer(absolute_rom, crc32_generator)
 
-                        rom_title = get_dat_rom_name(dat, dat_crc32.upper())
-                        if not rom_title:
-                             rom_title = get_dat_rom_name(dat, dat_crc32.lower())
+                        rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
                     if unknown_remove and not rom_title:
                         raise NonFatalError("crc32 '{}' not found in dat".format(dat_crc32))
-                    elif not rom_title:
-                        warn("warn: '{}' : crc32 '{}' not found in dat, but not skipped".format(rom, dat_crc32))
-
-                #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
-                checksums_generator = get_checksums()
-                #hardpatch
-                if not patch or patch.endswith('.reset.xdelta'):
-                    (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
-                else:
-                    (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
 
                 if store_xattr:
                     attr = xattr.xattr(absolute_rom)
@@ -678,7 +670,15 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     attr['user.rom.md5'] = md5.encode('ascii')
                     attr['user.rom.sha1'] = sha1.encode('ascii')
 
-                if metadata_exists:
+                if not metadata_exists and patch:
+                    warn("warn: '{}' : has patch without a version file".format(rom))
+                    continue
+                #only add non-patched files if the dat was given and a title was
+                #not found, which means the file was modified (patched) or that
+                #the dat never had it, which in effect means the same thing nowadays
+                if metadata_exists and (patch or (not rom_title and dat)):
+                    if not patch and not rom_title:
+                        warn("warn: '{}' : no patch and crc32 '{}' not found in dat, assume a hardpatch".format(rom, dat_crc32))
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
                     #we don't process this now for merge-dat to work
                     hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
