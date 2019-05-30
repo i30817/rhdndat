@@ -610,7 +610,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     raise NonFatalError('multiple possible patches found')
 
                 if test_versions_only: #only be this noisy on the 'test' flag
-                    if xattr.xattr(absolute_rom)['user.rom.crc32'] == None:
+                    if not 'user.rom.crc32' in xattr.xattr(absolute_rom):
                         log('info: {} : run with -x once to set rom xattr'.format(rom))
 
                 if test_versions_only and metadata_exists:
