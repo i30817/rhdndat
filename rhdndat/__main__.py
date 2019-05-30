@@ -609,17 +609,17 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
+                if test_versions_only: #only be this noisy on the 'test' flag
+                    if xattr.xattr(absolute_rom)['user.rom.crc32'] == None:
+                        log('info: {} : run with -x once to set rom xattr'.format(rom))
+
                 if test_versions_only and metadata_exists:
                     get_romhacking_data(rom, possible_metadata)
                     continue
 
                 #skip work if metadata does not exist and we do not want to store xattr
-                if not store_xattr:
-                    #but still show the files without them
-                    if xattr.xattr(absolute_rom)['user.rom.crc32'] == None:
-                        log('info: {} run with -x once to set rom xattr'.format(rom))
-                    if not metadata_exists:
-                        continue
+                if not store_xattr and not metadata_exists:
+                    continue
 
                 if DEBUG and metadata_exists:
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
