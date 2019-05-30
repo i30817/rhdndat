@@ -313,6 +313,14 @@ def producer(arguments, generator_function):
         with subprocess.Popen(arguments,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL) as process:
+            #errors can occur even before opening the pipe (this can hang if the process never opened the pipe for writting)
+            #to be clear this is a fallible hack TODO: remove this if upstream flips resolves the issue i opened
+            try:
+                process.wait(timeout=0.3)  # the child has 0.3 seconds to open for writing
+            except subprocess.TimeoutExpired:
+                pass
+            if process.poll() != None:
+                raise NonFatalError('error during startup of patching, probably invalid patch')
             with open(pipe, 'rb') as fifo:
                 bytes = fifo.read(BLOCKSIZE)
                 while len(bytes) > 0:
@@ -740,7 +748,7 @@ def main():
     if args.i and not args.d:
         error("error: -i option requires -d option to whitelist roms on the dat")
         return 1
-    if args.t and (args.o or args.m or args.d or args.i or args.x):
+    if args.t and (args.o or args.m or args.d or args.i):
         error("error: -t option can't be used with other options")
         return 1
 
