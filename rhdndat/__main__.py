@@ -638,8 +638,8 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 ###find the original rom title on dat###
                 rom_title = None
+                dat_crc32 = None
                 if dat:
-                    dat_crc32 = None
                     if patch and skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
                         #bps roms have 12 bytes footers with the source, destination and patch crc32s
                         #unfortunately, this doesn't work if the dat we're working with skips headers
@@ -651,6 +651,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                         rom_title = get_dat_rom_name(dat, dat_crc32.lower())
                     elif skip_bytes == 0 and (not patch or patch.endswith('.reset.xdelta')): #reuse 'not a softpatch' value from above
+                        dat_crc32 = crc
                         rom_title = get_dat_rom_name(dat, crc)
                     else: #it's probably a softpatch or a very small hardpatch here
                         crc32_generator = get_crc32(skip_bytes)
