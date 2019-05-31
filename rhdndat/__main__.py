@@ -252,17 +252,6 @@ def hack_dat(file):
     mamepro =  header + hacks
     return mamepro.parseFile(file, parseAll=True)
 
-@contextmanager
-def named_pipes(n=1):
-    dirname = tempfile.mkdtemp()
-    try:
-        paths = [os.path.join(dirname, 'romhack_pipe' + str(i)) for i in range(n)]
-        for path in paths:
-            os.mkfifo(path)
-        yield paths
-    finally:
-        shutil.rmtree(dirname)
-
 #skip first n bytes (normally because it's a header that the dat doesn't record)
 def get_crc32(skip):
     hash_crc32  = 0
@@ -323,31 +312,15 @@ def producer(arguments, generator_function):
         applying the generator function to that fifo. Make sure the command
         output is setup for the last argument to be a output file in the arguments
     '''
-    BLOCKSIZE = 2 ** 20
-    process = None
+    #read and patchers write to the error stream so if there is a error, the pipe still gets notified
+    arguments.append("/dev/stderr") #not portable to windows (maybe with CON but i'd have to test it)
     next(generator_function)
-    with named_pipes() as pipes:
-        pipe = pipes[0]
-        arguments.append(pipe)
-        with subprocess.Popen(arguments,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL) as process:
-            #errors can occur even before opening the pipe (this can hang if the process never opened the pipe for writting)
-            #to be clear this is a fallible hack TODO: remove this if upstream flips resolves the issue i opened
-            try:
-                process.wait(timeout=0.3)  # the child has 0.3 seconds to open for writing
-            except subprocess.TimeoutExpired:
-                pass
-            if process.poll() != None:
-                raise NonFatalError('error during startup of patching, probably invalid patch')
-            with open(pipe, 'rb') as fifo:
-                bytes = fifo.read(BLOCKSIZE)
-                while len(bytes) > 0:
-                    generator_function.send(bytes)
-                    bytes = fifo.read(BLOCKSIZE)
-    #if a error occurred avoid writing bogus checksums
-    if process.returncode != 0:
-        raise NonFatalError('error during patching, try to remove the header if a snes rom')
+    with subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as process:
+        for byt in process.stderr:
+            generator_function.send(byt)
+        #if a error occurred avoid writing bogus checksums
+        if process.returncode != 0:
+            raise NonFatalError('error during patching')
 
     return generator_function.send([])
 
