@@ -318,9 +318,9 @@ def producer(arguments, generator_function):
     with subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as process:
         for byt in process.stderr:
             generator_function.send(byt)
-        #if a error occurred avoid writing bogus checksums
-        if process.returncode != 0:
-            raise NonFatalError('error during patching')
+    #if a error occurred avoid writing bogus checksums
+    if process.returncode != 0:
+        raise NonFatalError('error during patching')
 
     return generator_function.send([])
 
