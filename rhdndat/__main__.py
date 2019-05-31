@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 
-import argparse, sys, os, shutil, struct, signal, hashlib, itertools
+import argparse, sys, os, shutil, struct, signal, hashlib, itertools, pathlib
 import urllib.request, subprocess, tempfile, zlib, difflib
 from argparse import FileType
 from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
 from contextlib import contextmanager
 from collections import Counter
+from pathlib import Path
 
 from rhdndat.__init__ import *
 
@@ -38,17 +39,33 @@ def error(string, end='\n'):
 def log(string, end='\n'):
     print(Fore.BLUE + string + Fore.RESET, file=sys.stderr, end=end)
 
-class FatalError(Exception):
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
+class EXENotFoundError(Exception):
+    def __init__(self, executable):
+        super().__init__()
+        self.executable = executable
+
+class VersionFileSyntaxError(Exception):
+    def __init__(self, versionfile):
+        super().__init__()
+        self.versionfile = versionfile
+
+class VersionFileURLError(Exception):
+    def __init__(self, versionfile, url):
+        super().__init__()
+        self.versionfile = versionfile
+        self.url = url
+
+class UnrecognizedRomError(Exception):
+    def __init__(self, crc):
+        super().__init__()
+        self.crc = crc
+
+class RHDNTRomRemovedError(Exception):
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
 
 class NonFatalError(Exception):
-    def __init__(self, message, errors=None):
-        super().__init__(message)
-        self.errors = errors
-
-class InternetFatalError(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message)
         self.errors = errors
@@ -297,6 +314,8 @@ def which(executable):
         flips = shutil.which(executable, path=os.path.dirname(__file__))
     if not flips:
         flips = shutil.which(executable, path=os.getcwd())
+    if not flips:
+        raise EXENotFoundError(executable)
     return flips
 
 def producer(arguments, generator_function):
@@ -335,16 +354,11 @@ def producer(arguments, generator_function):
 def patch_producer(patch, source, generator_function):
     if patch.endswith('.xdelta'):
         xdelta = which('xdelta3')
-        if not xdelta:
-            raise FatalError('xdelta3 not found')
         return producer([xdelta, '-d', '-s',  source, patch], generator_function)
     else:
         flips = which('flips')
-        if not flips:
-            raise FatalError('flips not found')
         return producer([flips, '--exact', '-a', patch, source], generator_function)
 
-#version files contain sequences of two lines: a version number and a romhacking url
 def read_version_file(possible_metadata):
     hacks_list = []
     try:
@@ -352,24 +366,23 @@ def read_version_file(possible_metadata):
             while True:
                 version = file_version.readline()
                 url = file_version.readline()
-                assert ( version and url ) or not ( version or url ), 'version files require (version, url) pairs'
+                assert ( version and url ) or ( not version and not url )
                 if not url: break
+                assert Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url)
                 hacks_list += [(version.strip(), url.strip())]
     except Exception as e:
-        raise NonFatalError('has version file, but no valid contents')
+        raise VersionFileSyntaxError(possible_metadata)
     if not hacks_list:
-        raise NonFatalError('has version file, but no valid contents')
-    for version, url in hacks_list:
-        if not (Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url) ):
-            raise NonFatalError('has no valid romhacking urls in version file')
+        raise VersionFileSyntaxError(possible_metadata)
     return hacks_list
 
 def get_romhacking_data(rom, possible_metadata):
     metadata = []
     language = None
     version_hacks = read_version_file(possible_metadata)
-    try:
-        for (version, url) in version_hacks:
+
+    for (version, url) in version_hacks:
+        try:
             page = urllib.request.urlopen(url).read()
             soup = BeautifulSoup(page, 'lxml')
 
@@ -379,7 +392,7 @@ def get_romhacking_data(rom, possible_metadata):
             if check_removed:
                 check_removed = check_removed.find('div', class_='topbar', string='RHDN Error Encountered!')
                 if check_removed:
-                    raise NonFatalError("'{}' was removed from romhacking.net, check dats to delete previous versions".format(url))
+                    raise RHDNTRomRemovedError(url)
 
             info = soup.find('table', class_='entryinfo entryinfosmall').find('tbody')
 
@@ -408,11 +421,16 @@ def get_romhacking_data(rom, possible_metadata):
             )]
 
             remote_version = info.find('th', string='Patch Version').nextSibling.string.strip()
-            if remote_version and remote_version != version:
-              warn("warn: '{}' local '{}' != upstream '{}' versions".format(rom, version, remote_version))
-        return (metadata, language)
-    except urllib.error.URLError as e:
-        raise InternetFatalError("'{}' rhdndata requires a active internet connection".format(rom), e)
+            if remote_version and remote_version != version: #not a error to not force users to upgrade
+                warn("warn: {} local '{}' != upstream '{}' versions".format(rom, version, remote_version))
+                p = Path(os.path.dirname(possible_metadata)).as_uri()
+                f = Path(possible_metadata).as_uri()
+                warn(' patch: {}'.format(url))
+                warn(' path:  {}'.format(p))
+                warn(' file:  {}'.format(f))
+        except urllib.error.URLError as e:
+            raise VersionFileURLError(possible_metadata, url)
+    return (metadata, language)
 
 def get_dat_rom_name(dat, dat_crc32):
     dat_rom = dat.find('rom', crc=dat_crc32)
@@ -528,13 +546,13 @@ def filter_hacks(hacks, merge_hacks):
 
         #same hack crc -> same hack version
         matches = [ (ix,x) for ix,x in candidates if not_frozen(ix) and x._crc == h._crc ]
-        error = "warn: '{}', {} matching crcs '{}' in the merge file".format(h._name, len(matches), h._crc)
+        error = "warn: {}, {} matching crcs {} in the merge file".format(h._name, len(matches), h._crc)
         match_one_if_available(matches, error, index, h)
 
         #only hack with a fileformat after 'cd' elimination -> only hack possibility
         extension = h.rom_extension
         ext = [ (ix,x) for ix,x in candidates if not_frozen(ix) and x.rom_extension == extension ]
-        error = "warn: '{}', {} urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
+        error = "warn: {}, {} urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
         match_one_if_available(ext, error, index, h)
 
         #non-match update for hacks with different fileformats where the 
@@ -595,7 +613,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
     romtypes   = ['.'+romtype, '.'+romtype.upper(), '.'+romtype.lower()]
 
     hacks = []
-    for dirpath, _, files in os.walk(searchdir):
+    for dirpath, _, files in os.walk(os.path.abspath(searchdir)):
         for rom in files:
 
             (root, ext) = os.path.splitext(rom)
@@ -631,7 +649,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         x = xattr.xattr(absolute_rom)
                         if 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x:
                             continue
-                            
 
                 if DEBUG and metadata_exists:
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
@@ -687,23 +704,31 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
                     if unknown_remove and not rom_title:
-                        raise NonFatalError("crc32 '{}' not found in dat".format(dat_crc32))
+                        raise UnrecognizedRomError(dat_crc32)
 
                 if not metadata_exists and patch:
-                    warn("warn: '{}' : has patch without a version file".format(rom))
+                    log("info: {} : has patch without a version file".format(rom))
                     continue
                 #only add non-patched files if the dat was given and a title was
                 #not found, which means the file was modified (patched) or that
                 #the dat never had it, which in effect means the same thing nowadays
                 if metadata_exists and (patch or (not rom_title and dat)):
                     if not patch and not rom_title:
-                        warn("warn: '{}' : no patch and crc32 '{}' not found in dat, assume a hardpatch".format(rom, dat_crc32))
+                        log("info: {} : no patch and crc32 {} not found in dat, assume a hardpatch".format(rom, dat_crc32))
                     (metadata, language) = get_romhacking_data(rom, possible_metadata)
                     #we don't process this now for merge-dat to work
                     hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                     hacks.append(hack)
-            except NonFatalError as e: #let the default stop execution and print on other errors
-                log("skip: '{}' : {}".format(rom, e))
+            except UnrecognizedRomError as e:
+                warn('skip: {} : crc {} not in dat file'.format(rom, e.crc))
+                continue
+            except RHDNTRomRemovedError as e:
+                warn('skip: {} : romhacking.net deleted patch, check reason and delete last version from dat if bad'.format(rom))
+                warn(' patch: {}'.format(e.url))
+                continue
+            except NonFatalError as e:
+                warn('skip: {} : {}'.format(rom, e))
+                warn(' path: {}'.format(Path(dirpath).as_uri()))
                 continue
 
     if output_file:
@@ -720,7 +745,7 @@ def parse_args():
         return r_in
     def searchpath_is_dir(p_in):
         if not os.path.isdir(p_in):
-            raise argparse.ArgumentTypeError("'{}' must be a dir".format(p_in))
+            raise argparse.ArgumentTypeError("{} must be a dir".format(p_in))
         return p_in
     types = argparse.RawTextHelpFormatter
     parser = argparse.ArgumentParser(description=desc_with_version, formatter_class=types)
@@ -741,30 +766,44 @@ def parse_args():
 DEBUG=0
 def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
-
     parser = parse_args()
     args = parser.parse_args()
-    flips = which('flips')
-    xdelta = which('xdelta3')
-    if not (flips and xdelta):
-        error('error: rhdndat needs xdelta3 and flips on the path or script dir')
-        return 1
-    if args.i and not args.d:
-        error("error: -i option requires -d option to whitelist roms on the dat")
-        return 1
-    if args.t and (args.o or args.m or args.d or args.i or args.x):
-        error("error: -t option can't be used with other options")
-        return 1
-
     try:
+        #for early failure instead of failing when trying later
+        flips = which('flips')
+        xdelta = which('xdelta3')
+
+        if args.i and not args.d:
+            error("error: -i option requires -d option to whitelist roms on the dat")
+            return 1
+        if args.t and (args.o or args.m or args.d or args.i or args.x):
+            error("error: -t option can't be used with other options")
+            return 1
+
         dat = None if not args.m else hack_dat(args.m)
         make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x)
     except ParseException as e: #fail early for parsing this to prevent data loss
-        error("error: '{}' parsing clrmamepro merge dat : {}".format(args.m.name, e))
+        error("error: {} parsing dat : {}".format(args.m.name, e))
         return 1
-    except (FatalError, InternetFatalError) as e:
-        error('error: {}'.format(e))
+    except EXENotFoundError as e:
+        error('error: rhdndat needs {} on its location, the current dir, or the OS path'.format(e.executable))
+        p = os.path.dirname(sys.argv[0])
+        if(os.access(p, os.W_OK|os.X_OK)):
+            uri = Path(p).as_uri()
+        else:
+            uri = Path(os.getcwd()).as_uri()
+        error(' suggested path: {}'.format(uri))
         return 1
+    except VersionFileURLError as e:
+        error('error: version file url connection failure')
+        error(' file: {}'.format(Path(e.versionfile).as_uri()))
+        error(' url:  {}'.format(e.url))
+        return 1
+    except VersionFileSyntaxError as e:
+        error('error: version files repeat two lines, a version string and a romhacking url')
+        error(' file: {}'.format(Path(e.versionfile).as_uri()))
+        return 1
+    return 0
 
 if __name__ == '__main__':
     sys.exit(main())
