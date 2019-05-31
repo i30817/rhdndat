@@ -252,6 +252,16 @@ def hack_dat(file):
     mamepro =  header + hacks
     return mamepro.parseFile(file, parseAll=True)
 
+def which(executable):
+    flips = shutil.which(executable)
+    if not flips:
+        flips = shutil.which(executable, path=os.path.dirname(__file__))
+    if not flips:
+        flips = shutil.which(executable, path=os.getcwd())
+    if not flips:
+        raise EXENotFoundError(executable)
+    return flips
+
 #skip first n bytes (normally because it's a header that the dat doesn't record)
 def get_crc32(skip):
     hash_crc32  = 0
@@ -287,25 +297,11 @@ def get_checksums():
     yield (size, crc, md5, sha1)
 
 def file_producer(source_filename, generator_function):
-    BLOCKSIZE = 2 ** 20
-
     next(generator_function)
     with open(source_filename, 'rb') as f:
-        bytes = f.read(BLOCKSIZE)
-        while len(bytes) > 0:
-            generator_function.send(bytes)
-            bytes = f.read(BLOCKSIZE)
+        for byt in f:
+            generator_function.send(byt)
     return generator_function.send([])
-
-def which(executable):
-    flips = shutil.which(executable)
-    if not flips:
-        flips = shutil.which(executable, path=os.path.dirname(__file__))
-    if not flips:
-        flips = shutil.which(executable, path=os.getcwd())
-    if not flips:
-        raise EXENotFoundError(executable)
-    return flips
 
 def producer(arguments, generator_function):
     ''' will append a output fifo to the end of the argument list prior to
