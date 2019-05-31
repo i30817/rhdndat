@@ -1,13 +1,14 @@
 #!/usr/bin/python3
 
 import argparse, sys, os, shutil, struct, signal, hashlib, itertools, pathlib
-import urllib.request, subprocess, tempfile, zlib, difflib
+import urllib.request, subprocess, tempfile, zlib, difflib, io
 from argparse import FileType
 from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
 from contextlib import contextmanager
 from collections import Counter
 from pathlib import Path
+from io import DEFAULT_BUFFER_SIZE
 
 from rhdndat.__init__ import *
 
@@ -298,7 +299,7 @@ def get_checksums():
 def file_producer(source_filename, generator_function):
     next(generator_function)
     with open(source_filename, 'rb') as f:
-        for byt in iter(lambda:f.read(2**20),b''):
+        for byt in iter(lambda:f.read(DEFAULT_BUFFER_SIZE), b''):
             generator_function.send(byt)
     return generator_function.send([])
 
