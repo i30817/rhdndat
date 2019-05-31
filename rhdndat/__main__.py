@@ -282,7 +282,6 @@ def get_checksums():
     size = 0
 
     buf = yield
-
     while len(buf) > 0:
         size += len(buf)
         hash_md5.update(buf)
@@ -299,7 +298,7 @@ def get_checksums():
 def file_producer(source_filename, generator_function):
     next(generator_function)
     with open(source_filename, 'rb') as f:
-        for byt in f:
+        for byt in iter(lambda:f.read(2**20),b''):
             generator_function.send(byt)
     return generator_function.send([])
 
