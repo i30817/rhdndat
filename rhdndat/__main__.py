@@ -308,8 +308,10 @@ def producer(arguments, generator_function):
         applying the generator function to that fifo. Make sure the command
         output is setup for the last argument to be a output file in the arguments
     '''
-    #read and patchers write to the error stream so if there is a error, the pipe still gets notified
-    arguments.append("/dev/stderr") #not portable to windows (maybe with CON but i'd have to test it)
+    #read and patchers write to the error stream so if there is a error
+    #(that corrupts the stream), it doesn't matter because the return code would
+    #be non-zero anyway
+    arguments.append("/dev/stderr") #not portable to windows
     next(generator_function)
     with subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE) as process:
         for byt in process.stderr:
