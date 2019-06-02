@@ -640,7 +640,11 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     patch = patches[0]
 
                 def all_there(x):
-                    return 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x and 'user.rhdndat.version_id' in x
+                    return ('user.rom.size' in x
+                        and 'user.rom.crc32' in x
+                        and 'user.rom.md5' in x
+                        and 'user.rom.sha1' in x
+                        and 'user.rhdndat.version_id' in x)
 
                 ###find checksums of the 'final' patched file###
 
@@ -649,7 +653,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if xattr_available:
                     x = xattr.xattr(absolute_rom)
                     if not forcexattr and all_there(x) and (not metadata_exists or version_id == x['user.rhdndat.version_id']):
-                        size = os.path.getsize(absolute_rom)
+                        size = int(x['user.rom.size'].decode('ascii'))
                         crc  = x['user.rom.crc32'].decode('ascii')
                         md5  = x['user.rom.md5'].decode('ascii')
                         sha1 = x['user.rom.sha1'].decode('ascii')
@@ -665,6 +669,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     #store
                     if xattr_available:
                         attr = xattr.xattr(absolute_rom)
+                        attr['user.rom.size'] = str(size).encode('ascii')
                         attr['user.rom.crc32'] = crc.encode('ascii')
                         attr['user.rom.md5'] = md5.encode('ascii')
                         attr['user.rom.sha1'] = sha1.encode('ascii')
