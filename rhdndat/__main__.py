@@ -274,7 +274,7 @@ def get_crc32(skip):
         hash_crc32 = zlib.crc32(buf, hash_crc32)
         buf = yield
 
-    yield '{:08x}'.format( hash_crc32 & 0xffffffff )
+    return '{:08x}'.format( hash_crc32 & 0xffffffff )
 
 def get_checksums():
     hash_md5   = hashlib.md5()
@@ -294,7 +294,7 @@ def get_checksums():
     md5 = hash_md5.hexdigest()
     sha1 = hash_sha1.hexdigest()
 
-    yield (size, crc, md5, sha1)
+    return (size, crc, md5, sha1)
 
 def file_producer(source_filename, generator_function):
     next(generator_function)
@@ -332,6 +332,8 @@ def patch_producer(patch, source, generator_function):
 
 def read_version_file(possible_metadata):
     hacks_list = []
+    crc = get_crc32(0)
+    next(crc)
     try:
         with open(possible_metadata, 'r') as file_version:
             while True:
@@ -340,17 +342,27 @@ def read_version_file(possible_metadata):
                 assert ( version and url ) or ( not version and not url )
                 if not url: break
                 assert Hack.is_rhdn_translation(url) or Hack.is_rhdn_hack(url)
-                hacks_list += [(version.strip(), url.strip())]
+                version = version.strip()
+                url = url.strip()
+                crc.send(version.encode('utf-8'))
+                crc.send(url.encode('utf-8'))
+                hacks_list += [(version, url)]
     except Exception as e:
         raise VersionFileSyntaxError(possible_metadata)
     if not hacks_list:
         raise VersionFileSyntaxError(possible_metadata)
-    return hacks_list
+    return (crc.send([]), hacks_list)
 
 def get_romhacking_data(rom, possible_metadata):
+''' returns the triple (metadata, language, version_id)
+    metadata is a list of (title, authors_string, version, url) 1 for each hack
+    language is the last language of the hacks
+    version_id, refers to the local version entries crc32 as a cache
+    invalidation marker when the version file changed (the user edited the version file)
+'''
     metadata = []
     language = None
-    version_hacks = read_version_file(possible_metadata)
+    version_id, version_hacks = read_version_file(possible_metadata)
 
     for (version, url) in version_hacks:
         try:
@@ -367,13 +379,16 @@ def get_romhacking_data(rom, possible_metadata):
 
             info = soup.find('table', class_='entryinfo entryinfosmall').find('tbody')
 
-            #hacks have no language
+            #hacks have no language and translations shouldn't change it 2+ times
             tmp  = info.find('th', string='Language')
             tmp  = tmp and tmp.nextSibling.string
-            #it's a error for a translation to have 1+ languages, whatever combination of patches there is
-            if not language:
+            if tmp and language and tmp != language:
+                log('info: {} : language should not have changed twice with patches from romhacking.net'.format(rom))
+                p = Path(os.path.dirname(possible_metadata)).as_uri()
+                f = Path(possible_metadata).as_uri()
+                log(' path:  {}'.format(p))
+                log(' file:  {}'.format(f))
                 language = tmp
-            assert ( tmp == None or tmp == language ), 'language of a translation should never change with a addendum'
 
             authors = info.find('th', string='Released By').nextSibling
             authors_str = authors.string
@@ -401,7 +416,7 @@ def get_romhacking_data(rom, possible_metadata):
                 warn(' file:  {}'.format(f))
         except urllib.error.URLError as e:
             raise VersionFileURLError(possible_metadata, url)
-    return (metadata, language)
+    return (metadata, language, version_id)
 
 def get_dat_rom_name(dat, dat_crc32):
     dat_rom = dat.find('rom', crc=dat_crc32)
@@ -526,7 +541,7 @@ def filter_hacks(hacks, merge_hacks):
         error = "warn: {}, {} urls+extension matches after full filename (multi-cd) filter".format(h._name, len(ext))
         match_one_if_available(ext, error, index, h)
 
-        #non-match update for hacks with different fileformats where the 
+        #non-match update for hacks with different fileformats where the
         #user only has one softpatch ready but the program can tell others apply
         #this needs to be obey frozen (ideally freeze values themselves if not frozen)
         #TODO Version could conflict (needs better parsers to fix)
@@ -606,87 +621,94 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                if test_versions_only and metadata_exists:
-                    get_romhacking_data(rom, possible_metadata)
+                if test_versions_only:
+                    if metadata_exists:
+                        get_romhacking_data(rom, possible_metadata)
                     continue
 
-                #when a version file exists, this shortcut is disabled, which means the 
-                #checksums will be regenerated on files of directories with patches only
-                #and assumed not not to 'change' on directories without, which might be flawed
-                if not metadata_exists and not forcexattr: 
-                    if not xattr_available:
-                        continue
-                    else:
-                        x = xattr.xattr(absolute_rom)
-                        if 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x:
-                            continue
+                #memoize this for two different branches later, also early failure
+                metadata, language, version_id = (None, None, '')
+                if metadata_exists:
+                    metadata, language, version_id = get_romhacking_data(rom, possible_metadata)
 
-                if DEBUG and metadata_exists:
-                    (metadata, language) = get_romhacking_data(rom, possible_metadata)
-                    hack = Hack.fromRhdnet(metadata,language,rom,rom,0,''.zfill(8),''.zfill(32),''.zfill(40))
-                    hacks.append(hack)
-                    continue
-
+                #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 patch = None
                 if patches:
                     patch = patches[0]
 
-                #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
+                def all_there(x):
+                    return 'user.rom.crc32' in x and 'user.rom.md5' in x and
+                        'user.rom.sha1' in x and 'user.rom.rhdndat.version_id' in x:
 
                 ###find checksums of the 'final' patched file###
-                checksums_generator = get_checksums()
-                if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
-                    (size, crc, md5, sha1) = patch_producer(patch, absolute_rom, checksums_generator)
-                else: #possible hardpatch (with reset or not) or just normal file of the right type
-                    (size, crc, md5, sha1) = file_producer(absolute_rom, checksums_generator)
 
-                #always store, since we already need to calculate it anyway
+                #unless forced, this disables checksums (re)generation if the version ids match or there is no version file
+                reused_xattr = False
                 if xattr_available:
-                    attr = xattr.xattr(absolute_rom)
-                    attr['user.rom.crc32'] = crc.encode('ascii')
-                    attr['user.rom.md5'] = md5.encode('ascii')
-                    attr['user.rom.sha1'] = sha1.encode('ascii')
-                    log('info: {} : stored checksums as extended attributes'.format(rom))
+                    x = xattr.xattr(absolute_rom)
+                    if not forcexattr and all_there(x) and (not metadata or version_id == x['user.rom.rhdndat.version_id']):
+                        size = os.path.getsize(absolute_rom)
+                        crc  = x['user.rom.crc32']
+                        md5  = x['user.rom.md5']
+                        sha1 = x['user.rom.sha1']
+                        reused_xattr = True
+                        if metadata:
+                            log('info: {} : version file did not change'.format(rom))
+                if not reused_xattr:
+                    checksums_generator = get_checksums()
+                    if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
+                        size, crc, md5, sha1 = patch_producer(patch, absolute_rom, checksums_generator)
+                    else: #possible hardpatch (with reset or not) or just normal file of the right type
+                        size, crc, md5, sha1 = file_producer(absolute_rom, checksums_generator)
+                    #store
+                    if xattr_available:
+                        attr = xattr.xattr(absolute_rom)
+                        attr['user.rom.crc32'] = crc.encode('ascii')
+                        attr['user.rom.md5'] = md5.encode('ascii')
+                        attr['user.rom.sha1'] = sha1.encode('ascii')
+                        attr['user.rom.rhdndat.version_id'] = version_id.encode('ascii')
+                        log('info: {} : stored checksums as extended attributes'.format(rom))
+
+                #after xattr there is no longer any need to process files
+                #without a version file since they won't end in rhdndat dats
+                if not metadata_exists:
+                    if patch:
+                        log("info: {} : has patch without a version file".format(rom))
+                    continue
 
                 ###find the original rom title on dat###
                 rom_title = None
                 dat_crc32 = None
                 if dat:
+                    #if it's a patch and a bps (note: bps can't be a reset patch) and the check dat doesn't skip
+                    #use the bps 12 bytes footers with the source, destination and patch crc32s
                     if patch and skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
-                        #bps roms have 12 bytes footers with the source, destination and patch crc32s
-                        #unfortunately, this doesn't work if the dat we're working with skips headers
-                        #(except for SNES headers, which is the one header bps ignores when creating/applying a patch)
-                        target = None
                         with open(patch, 'rb') as p:
                             p.seek(-12, os.SEEK_END)
                             dat_crc32 = '{:08x}'.format( struct.unpack('I', p.read(4))[0] )
-
-                        rom_title = get_dat_rom_name(dat, dat_crc32.lower())
-                    elif skip_bytes == 0 and (not patch or patch.endswith('.reset.xdelta')): #reuse 'not a softpatch' value from above
+                    #if 'not a softpatch' then the previously stored or calculated file crc32 is fine
+                    #(softpatches end with the crc of the final patched file in the computation above)
+                    elif skip_bytes == 0 and (not patch or patch.endswith('.reset.xdelta')):
                         dat_crc32 = crc
-                        rom_title = get_dat_rom_name(dat, crc)
-                    else: #it's probably a softpatch or a very small hardpatch here
+                    else:
                         crc32_generator = get_crc32(skip_bytes)
-                        if patch and patch.endswith('.reset.xdelta'): #it's a reversible hardpatch
+                        if patch and patch.endswith('.reset.xdelta'):
                             dat_crc32 = patch_producer(patch, absolute_rom, crc32_generator)
-                        else:#either the original file or a irreversible hardpatch
+                        else:
                             dat_crc32 =  file_producer(absolute_rom, crc32_generator)
 
-                        rom_title = get_dat_rom_name(dat, dat_crc32.lower())
+                    #if the file was irreversibly patched or unknown this will fail
+                    rom_title = get_dat_rom_name(dat, dat_crc32.lower())
 
                     if unknown_remove and not rom_title:
                         raise UnrecognizedRomError(dat_crc32)
 
-                if not metadata_exists and patch:
-                    log("info: {} : has patch without a version file".format(rom))
-                    continue
-                #only add non-patched files if the dat was given and a title was
-                #not found, which means the file was modified (patched) or that
-                #the dat never had it, which in effect means the same thing nowadays
-                if metadata_exists and (patch or (not rom_title and dat)):
+                #Files can be in same directory, part of the same game and with
+                #the same extension, and not patched at all (cd music tracks), filter
+                if patch or (dat and not rom_title):
                     if not patch and not rom_title:
                         log("info: {} : no patch and crc32 {} not found in dat, assume a hardpatch".format(rom, dat_crc32))
-                    (metadata, language) = get_romhacking_data(rom, possible_metadata)
+
                     #we don't process this now for merge-dat to work
                     hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                     hacks.append(hack)
@@ -734,7 +756,6 @@ def parse_args():
     parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
-DEBUG=0
 def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL) # Make Ctrl+C work
     parser = parse_args()

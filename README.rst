@@ -8,17 +8,25 @@ rhdndat: romhacking.net_ dat creator and update checker
 
 | A softpatch filename is:
 | ``rom filename - rom extension + patch extension`` or
-| ``rom filename - rom extension + .reset.xdelta`` 
+| ``rom filename - rom extension + .reset.xdelta``
 
 This last is a special case to recognize hardpatched roms with revert patches.
 
-If there is no patch file, but a version file exists, and the extension matches, the file will be assumed to be hardpatched, which can be avoided by passing ``-i``.
+version file is simply named ``version`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation.
 
-version file is simply named ``version`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation on the softpatch.
+If there is no patch file, but a version file exists, the extension matches, and ``-d`` is used and does not recognize the rom, the file will be assumed to be hardpatched, which can be avoided by passing ``-i``.
 
-During normal operation, for all roms rhdndat stores extended attributes user.rom.md5, user.rom.crc32 and user.rom.sha1 in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch. The calculation is skipped in roms that aren't in a dir with a version file if they already exist.
+During normal operation, for all roms rhdndat stores extended attributes ``user.rom.md5``, ``user.rom.crc32`` and ``user.rom.sha1`` in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch.
 
-The hope is that this will be supported by scanning tools like retroarch scanner in order to make it much more friendly to scan non-zip filesystems as well as solve some problems with softpatching false positives in the scanner.
+This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` option.
+
+The intended workflow is:
+
+``rhdnet dir romtype -t``
+
+``<update the patches and version files here>``
+
+``rhdnet dir romtype ...``
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
 
@@ -30,27 +38,27 @@ Arguments:
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
 
-                    if there is no (rom, romfilename patch) pair but a patch of 
-                    the form 'romfilename.reset.xdelta' is found, rom is treated
-                    as a hardpatched rom, -d will search for the checksum of the
-                    original rom and the output will be the checksums of 'rom'
-
-                    if (rom, version) pair exists, but no patch, rom is treated
-                    as hardpatched and printed unless -i is given
-
   -rom-type        extension (without dot) of roms to find patches for
 
 optional arguments:
   -h, --help      show this help message and exit
-  -o output-file  ouput file, if ommited writes to stdout
-  -m merge-file   merge non-overriden entries from this source file
+  -o output-file  output file, if omitted writes to stdout
+  -m merge-file   merge non-overridden entries from this source file
                   to override a entry, a new entry must list the same
                   romhacking urls as the older entry
 
-  -d xml-file     picks up the game names from from this cmpro .xml and the
-                  rom checksum (including if a revert patch is available),
-                  if no entry is found the program picks names from the
-                  romhacking.net hack page
+  -d xml-file     normally the name is from the romhacking.net hack page,
+                  but this option picks up the game names from from this
+                  clrmamepro .xml and the rom checksum (including if a
+                  revert patch is available)
+
+                  this allows adding unknown roms without a patch, which
+                  can't normally be added for safety, albeit with the
+                  romhacking page name (the dat blacklists the false
+                  unknowns, such as music tracks in cd games)
+
+                  it's your responsibility to use a dat that matches the
+                  game/set you're scanning to avoid false unknowns
 
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d

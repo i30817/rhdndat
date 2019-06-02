@@ -1,4 +1,4 @@
-__version__ = '1.5.5'
+__version__ = '1.6.0'
 
 import textwrap
 
@@ -8,31 +8,37 @@ Please install required libraries. You can install the most recent version with:
 \tpip3 install --user beautifulsoup4 lxml pyparsing colorama xattr'''
 
 desc_with_version ='''\
-rhdndat {} : www.romhacking.net dat creator 
+rhdndat {} : www.romhacking.net dat creator
 
-Finds triples (rom file, softpatch file, version file) on the same 
-directory and creates a clrmamepro entry on stdout or file for the result of 
-each softpatch. It can also serve as a notifier that a update is required by 
+Finds triples (rom file, softpatch file, version file) on the same
+directory and creates a clrmamepro entry on stdout or file for the result of
+each softpatch. It can also serve as a notifier that a update is required by
 comparing local versions to remote romhacking.net versions.
 
 A softpatch filename is: 'rom filename - rom extension + patch extension' or
 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing
 hardpatched roms and revert patches).
 
-If there is no patch file, but a version file exists, and the extension matches,
-the file will be assumed to be hardpatched, which can be avoided by passing -i.
+version file is simply named 'version' and has a version number line followed
+by a romhacking.net url line, repeated. These correspond to each hack or
+translation.
 
-version file is simply named 'version' and has a version number line followed 
-by a romhacking.net url line, repeated. These correspond to each hack or 
-translation on the softpatch.
+If there is no patch file, but a version file exists, the extension matches, and
+-d is used and does not recognize the rom, the file will be assumed to be
+hardpatched, which can be avoided by passing -i.
 
 During normal operation, for all roms rhdndat stores extended attributes
 user.rom.md5, user.rom.crc32 and user.rom.sha1 in the rom file, and these
 checksums refer to the 'patched' file, even if the patch is a softpatch.
 
-The hope is that this will be supported by scanning tools like retroarch scanner
-in order to make it much more friendly to scan non-zip filesystems as well as
-solve some problems with softpatching and checksum databases.
+This makes rhdndat faster by only checksumming again after version file
+modification or after using the -x option.
+
+The intended workflow is:
+
+rhdnet dir romtype -t
+<update the patches and version files here>
+rhdnet dir romtype ...
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
 with xdelta) on path or the same directory.'''
@@ -41,23 +47,15 @@ desc_with_version = textwrap.dedent(desc_with_version.format(__version__))
 desc_search ='''\
 directory tree to search for (rom, patches and version) files
 
-if there is no (rom, romfilename patch) pair but a patch of 
-the form \'romfilename.reset.xdelta\' is found, rom is treated 
-as a hardpatched rom, -d will search for the checksum of the
-original rom and the output will be the checksums of \'rom\'
-
-if (rom, version) pair exists, but no patch, rom is treated
-as hardpatched and printed unless -i is given
-
 '''
 desc_search = textwrap.dedent(desc_search)
 
 desc_ext = 'extension (without dot) of roms to find patches for'
 
-desc_output = 'output file, if ommited writes to stdout'
+desc_output = 'output file, if omitted writes to stdout'
 
 desc_merge ='''\
-merge non-overriden entries from this source file
+merge non-overridden entries from this source file
 to override a entry, a new entry must list the same
 romhacking urls as the older entry
 
@@ -65,10 +63,18 @@ romhacking urls as the older entry
 desc_merge = textwrap.dedent(desc_merge)
 
 desc_xml ='''\
-picks up the game names from from this cmpro .xml and the
-rom checksum (including if a revert patch is available),
-if no entry is found the program picks names from the
-romhacking.net hack page
+normally the name is from the romhacking.net hack page,
+but this option picks up the game names from from this
+clrmamepro .xml and the rom checksum (including if a
+revert patch is available)
+
+this allows adding unknown roms without a patch, which
+can't normally be added for safety, albeit with the
+romhacking page name (the dat blacklists the false
+unknowns, such as music tracks in cd games)
+
+it's your responsability to use a dat that matches the
+game/set you're scanning to avoid false unknowns
 
 '''
 desc_xml = textwrap.dedent(desc_xml)
