@@ -207,7 +207,7 @@ game (
 def hack_entry():
     '''clrmamepro ra hacks entries parser'''
     def always_lowercase_leading_zero_in_crc(token):
-        return token[0].lower().zfill(8)
+        return token[0].zfill(8)
 
     quotes = quotedString()
     quotes.setParseAction(removeQuotes)
@@ -701,6 +701,9 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                     #if the file was irreversibly patched or unknown this will fail
                     rom_title = get_dat_rom_name(dat, dat_crc32.lower())
+                    #i don't control this file, and because some actually do this, we have to do it
+                    if not rom_title:
+                        rom_title = get_dat_rom_name(dat, dat_crc32.upper())
 
                     if unknown_remove and not rom_title:
                         raise UnrecognizedRomError(dat_crc32)
