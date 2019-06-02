@@ -362,7 +362,7 @@ def get_romhacking_data(rom, possible_metadata):
     '''
     metadata = []
     language = None
-    version_id, version_hacks = read_version_file(possible_metadata)
+    _, version_hacks = read_version_file(possible_metadata)
 
     for (version, url) in version_hacks:
         try:
@@ -416,7 +416,7 @@ def get_romhacking_data(rom, possible_metadata):
                 warn(' file:  {}'.format(f))
         except urllib.error.URLError as e:
             raise VersionFileURLError(possible_metadata, url)
-    return (metadata, language, version_id)
+    return (metadata, language)
 
 def get_dat_rom_name(dat, dat_crc32):
     dat_rom = dat.find('rom', crc=dat_crc32)
@@ -626,10 +626,9 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         get_romhacking_data(rom, possible_metadata)
                     continue
 
-                #memoize this for two different branches later, also early failure
-                metadata, language, version_id = (None, None, '')
+                version_id = b''
                 if metadata_exists:
-                    metadata, language, version_id = get_romhacking_data(rom, possible_metadata)
+                    version_id = read_version_file(possible_metadata)[0].encode('ascii')
 
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 patch = None
@@ -645,13 +644,13 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 reused_xattr = False
                 if xattr_available:
                     x = xattr.xattr(absolute_rom)
-                    if not forcexattr and all_there(x) and (not metadata or version_id == x['user.rhdndat.version_id']):
+                    if not forcexattr and all_there(x) and (not metadata_exists or version_id == x['user.rhdndat.version_id']):
                         size = os.path.getsize(absolute_rom)
                         crc  = x['user.rom.crc32']
                         md5  = x['user.rom.md5']
                         sha1 = x['user.rom.sha1']
                         reused_xattr = True
-                        if metadata:
+                        if metadata_exists:
                             log('info: {} : version file did not change'.format(rom))
                 if not reused_xattr:
                     checksums_generator = get_checksums()
@@ -707,7 +706,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if patch or (dat and not rom_title):
                     if not patch and not rom_title:
                         log("info: {} : no patch and crc32 {} not found in dat, assume a hardpatch".format(rom, dat_crc32))
-
+                    metadata, language = get_romhacking_data(rom, possible_metadata)
                     #we don't process this now for merge-dat to work
                     hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
                     hacks.append(hack)
