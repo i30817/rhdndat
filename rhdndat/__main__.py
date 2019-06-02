@@ -644,9 +644,10 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         and 'user.rom.crc32' in x
                         and 'user.rom.md5' in x
                         and 'user.rom.sha1' in x
-                        and 'user.rhdndat.version_id' in x)
+                        and 'user.rhdndat.version_id' in x
+                        and 'user.rhdndat.crc32_source')
 
-                ###find checksums of the 'final' patched file###
+                ###find checksums of the 'final' patched file and the original if possible###
 
                 #unless forced, this disables checksums (re)generation if the version ids match or there is no version file
                 reused_xattr = False
@@ -657,6 +658,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         crc  = x['user.rom.crc32'].decode('ascii')
                         md5  = x['user.rom.md5'].decode('ascii')
                         sha1 = x['user.rom.sha1'].decode('ascii')
+                        dat_crc32 = x['user.rhdndat.crc32_source'].decode('ascii')
                         reused_xattr = True
                         if metadata_exists:
                             log('info: {} : version file did not change'.format(rom))
@@ -664,8 +666,13 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     checksums_generator = get_checksums()
                     if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
                         size, crc, md5, sha1 = patch_producer(patch, absolute_rom, checksums_generator)
+                        dat_crc32 =  file_producer(absolute_rom, get_crc32(skip_bytes))
                     else: #possible hardpatch (with reset or not) or just normal file of the right type
                         size, crc, md5, sha1 = file_producer(absolute_rom, checksums_generator)
+                        if patch:
+                            dat_crc32 = patch_producer(patch, absolute_rom, get_crc32(skip_bytes))
+                        else: #normal file or hardpatch without reset
+                            dat_crc32 = crc
                     #store
                     if xattr_available:
                         attr = xattr.xattr(absolute_rom)
@@ -674,39 +681,22 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         attr['user.rom.md5'] = md5.encode('ascii')
                         attr['user.rom.sha1'] = sha1.encode('ascii')
                         attr['user.rhdndat.version_id'] = version_id #already binary
+                        attr['user.rhdndat.crc32_source'] = dat_crc32.encode('ascii')
                         log('info: {} : stored checksums as extended attributes'.format(rom))
 
                 #after xattr there is no longer any need to process files
-                #without a version file since they won't end in rhdndat dats
+                #without a version file since they won't end in rhdndat dats (can be added manually)
                 if not metadata_exists:
                     if patch:
-                        log("info: {} : has patch without a version file".format(rom))
+                        warn("warn: {} : has patch without a version file".format(rom))
                     continue
 
                 ###find the original rom title on dat###
                 rom_title = None
                 dat_crc32 = None
                 if dat:
-                    #if it's a patch and a bps (note: bps can't be a reset patch) and the check dat doesn't skip
-                    #use the bps 12 bytes footers with the source, destination and patch crc32s
-                    if patch and skip_bytes == 0 and (patch.endswith('.bps') or patch.endswith('.BPS')):
-                        with open(patch, 'rb') as p:
-                            p.seek(-12, os.SEEK_END)
-                            dat_crc32 = '{:08x}'.format( struct.unpack('I', p.read(4))[0] )
-                    #if 'not a softpatch' then the previously stored or calculated file crc32 is fine
-                    #(softpatches end with the crc of the final patched file in the computation above)
-                    elif skip_bytes == 0 and (not patch or patch.endswith('.reset.xdelta')):
-                        dat_crc32 = crc
-                    else:
-                        crc32_generator = get_crc32(skip_bytes)
-                        if patch and patch.endswith('.reset.xdelta'):
-                            dat_crc32 = patch_producer(patch, absolute_rom, crc32_generator)
-                        else:
-                            dat_crc32 =  file_producer(absolute_rom, crc32_generator)
-
                     #if the file was irreversibly patched or unknown this will fail
                     rom_title = get_dat_rom_name(dat, dat_crc32.lower())
-                    #i don't control this file, and because some actually do this, we have to do it
                     if not rom_title:
                         rom_title = get_dat_rom_name(dat, dat_crc32.upper())
 
