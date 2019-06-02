@@ -274,7 +274,7 @@ def get_crc32(skip):
         hash_crc32 = zlib.crc32(buf, hash_crc32)
         buf = yield
 
-    return '{:08x}'.format( hash_crc32 & 0xffffffff )
+    yield '{:08x}'.format( hash_crc32 & 0xffffffff )
 
 def get_checksums():
     hash_md5   = hashlib.md5()
@@ -294,7 +294,7 @@ def get_checksums():
     md5 = hash_md5.hexdigest()
     sha1 = hash_sha1.hexdigest()
 
-    return (size, crc, md5, sha1)
+    yield (size, crc, md5, sha1)
 
 def file_producer(source_filename, generator_function):
     next(generator_function)
@@ -354,12 +354,12 @@ def read_version_file(possible_metadata):
     return (crc.send([]), hacks_list)
 
 def get_romhacking_data(rom, possible_metadata):
-''' returns the triple (metadata, language, version_id)
-    metadata is a list of (title, authors_string, version, url) 1 for each hack
-    language is the last language of the hacks
-    version_id, refers to the local version entries crc32 as a cache
-    invalidation marker when the version file changed (the user edited the version file)
-'''
+    ''' returns the triple (metadata, language, version_id)
+        metadata is a list of (title, authors_string, version, url) 1 for each hack
+        language is the last language of the hacks
+        version_id, refers to the local version entries crc32 as a cache
+        invalidation marker when the version file changed (the user edited the version file)
+    '''
     metadata = []
     language = None
     version_id, version_hacks = read_version_file(possible_metadata)
@@ -637,8 +637,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     patch = patches[0]
 
                 def all_there(x):
-                    return 'user.rom.crc32' in x and 'user.rom.md5' in x and
-                        'user.rom.sha1' in x and 'user.rom.rhdndat.version_id' in x:
+                    return 'user.rom.crc32' in x and 'user.rom.md5' in x and 'user.rom.sha1' in x and 'user.rhdndat.version_id' in x
 
                 ###find checksums of the 'final' patched file###
 
@@ -646,7 +645,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 reused_xattr = False
                 if xattr_available:
                     x = xattr.xattr(absolute_rom)
-                    if not forcexattr and all_there(x) and (not metadata or version_id == x['user.rom.rhdndat.version_id']):
+                    if not forcexattr and all_there(x) and (not metadata or version_id == x['user.rhdndat.version_id']):
                         size = os.path.getsize(absolute_rom)
                         crc  = x['user.rom.crc32']
                         md5  = x['user.rom.md5']
@@ -666,7 +665,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         attr['user.rom.crc32'] = crc.encode('ascii')
                         attr['user.rom.md5'] = md5.encode('ascii')
                         attr['user.rom.sha1'] = sha1.encode('ascii')
-                        attr['user.rom.rhdndat.version_id'] = version_id.encode('ascii')
+                        attr['user.rhdndat.version_id'] = version_id.encode('ascii')
                         log('info: {} : stored checksums as extended attributes'.format(rom))
 
                 #after xattr there is no longer any need to process files
