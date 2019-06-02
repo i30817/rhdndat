@@ -331,6 +331,11 @@ def patch_producer(patch, source, generator_function):
         return producer([flips, '--exact', '-a', patch, source], generator_function)
 
 def read_version_file(possible_metadata):
+    ''' returns tuple (version_id, [(version,url])
+        version_id, refers to the local version entries crc32 as a cache
+        invalidation marker when the version file changed (the user edited the version file)
+        the list is a list of versions and urls of the used patches
+    '''
     hacks_list = []
     crc = get_crc32(0)
     next(crc)
@@ -354,11 +359,9 @@ def read_version_file(possible_metadata):
     return (crc.send([]), hacks_list)
 
 def get_romhacking_data(rom, possible_metadata):
-    ''' returns the triple (metadata, language, version_id)
+    ''' returns the tuple (metadata, language)
         metadata is a list of (title, authors_string, version, url) 1 for each hack
         language is the last language of the hacks
-        version_id, refers to the local version entries crc32 as a cache
-        invalidation marker when the version file changed (the user edited the version file)
     '''
     metadata = []
     language = None
@@ -388,6 +391,7 @@ def get_romhacking_data(rom, possible_metadata):
                 f = Path(possible_metadata).as_uri()
                 log(' path:  {}'.format(p))
                 log(' file:  {}'.format(f))
+            if tmp:
                 language = tmp
 
             authors = info.find('th', string='Released By').nextSibling
@@ -646,9 +650,9 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     x = xattr.xattr(absolute_rom)
                     if not forcexattr and all_there(x) and (not metadata_exists or version_id == x['user.rhdndat.version_id']):
                         size = os.path.getsize(absolute_rom)
-                        crc  = x['user.rom.crc32']
-                        md5  = x['user.rom.md5']
-                        sha1 = x['user.rom.sha1']
+                        crc  = x['user.rom.crc32'].decode('ascii')
+                        md5  = x['user.rom.md5'].decode('ascii')
+                        sha1 = x['user.rom.sha1'].decode('ascii')
                         reused_xattr = True
                         if metadata_exists:
                             log('info: {} : version file did not change'.format(rom))
@@ -664,7 +668,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         attr['user.rom.crc32'] = crc.encode('ascii')
                         attr['user.rom.md5'] = md5.encode('ascii')
                         attr['user.rom.sha1'] = sha1.encode('ascii')
-                        attr['user.rhdndat.version_id'] = version_id.encode('ascii')
+                        attr['user.rhdndat.version_id'] = version_id #already binary
                         log('info: {} : stored checksums as extended attributes'.format(rom))
 
                 #after xattr there is no longer any need to process files
