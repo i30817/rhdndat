@@ -693,7 +693,6 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 ###find the original rom title on dat###
                 rom_title = None
-                dat_crc32 = None
                 if dat:
                     #if the file was irreversibly patched or unknown this will fail
                     rom_title = get_dat_rom_name(dat, dat_crc32.lower())
