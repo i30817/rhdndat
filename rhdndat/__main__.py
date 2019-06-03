@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import argparse, sys, os, shutil, struct, signal, hashlib, itertools, pathlib
-import urllib.request, subprocess, tempfile, zlib, difflib, io
+import urllib.request, subprocess, tempfile, zlib, difflib, io, platform
 from argparse import FileType
 from urllib.parse import urlparse
 from tempfile import NamedTemporaryFile
@@ -386,11 +386,11 @@ def get_romhacking_data(rom, possible_metadata):
             tmp  = info.find('th', string='Language')
             tmp  = tmp and tmp.nextSibling.string
             if tmp and language and tmp != language:
-                log('info: {} : language should not have changed twice with patches from romhacking.net'.format(rom))
+                warn('warn: {}->{} : language should not have changed twice with patches from romhacking.net'.format(language,tmp))
                 p = Path(os.path.dirname(possible_metadata)).as_uri()
                 f = Path(possible_metadata).as_uri()
-                log(' path:  {}'.format(p))
-                log(' file:  {}'.format(f))
+                warn(' path:  {}'.format(p))
+                warn(' file:  {}'.format(f))
             if tmp:
                 language = tmp
 
@@ -621,14 +621,14 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
             metadata_exists = os.path.isfile(possible_metadata)
 
             try:
-                #force user to fix this
-                if len(patches) > 1:
-                    raise NonFatalError('multiple possible patches found')
-
                 if test_versions_only:
                     if metadata_exists:
                         get_romhacking_data(rom, possible_metadata)
                     continue
+
+                #force user to fix this
+                if len(patches) > 1:
+                    raise NonFatalError('multiple possible patches found')
 
                 version_id = b''
                 if metadata_exists:
@@ -696,7 +696,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if dat:
                     #if the file was irreversibly patched or unknown this will fail
                     rom_title = get_dat_rom_name(dat, dat_crc32.lower())
-                    if not rom_title:
+                    if not rom_title: #some dats have uppercase checksums
                         rom_title = get_dat_rom_name(dat, dat_crc32.upper())
 
                     if unknown_remove and not rom_title:
@@ -743,16 +743,18 @@ def parse_args():
     parser = argparse.ArgumentParser(description=desc_with_version, formatter_class=types)
     parser.add_argument('p', metavar=('search-path'), type=searchpath_is_dir, help=desc_search)
     parser.add_argument('r', metavar=('rom-type'), type=no_dot_in_extension, help=desc_ext)
-    #dont clobber file because we may read from it in -m. move tmpfile over it later
-    parser.add_argument('-o', metavar=('output-file'), type=FileType('a+', encoding='utf-8'), help=desc_output)
-    parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
-    parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
-    parser.add_argument('-i', action='store_true', help=desc_ignore)
-    if xattr_available:
-        parser.add_argument('-x', action='store_true', help=desc_forcexattr)
-    else:
-        parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
-    parser.add_argument('-t', action='store_true', help=desc_check)
+
+    if platform.platform != "Windows": #options not compatible for lack of anonymous fifo
+        #dont clobber file because we may read from it in -m. move tmpfile over it later
+        parser.add_argument('-o', metavar=('output-file'), type=FileType('a+', encoding='utf-8'), help=desc_output)
+        parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
+        parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
+        parser.add_argument('-i', action='store_true', help=desc_ignore)
+        if xattr_available:
+            parser.add_argument('-x', action='store_true', help=desc_forcexattr)
+        else:
+            parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
+        parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
 def main():
@@ -760,6 +762,10 @@ def main():
     parser = parse_args()
     args = parser.parse_args()
     try:
+        if platform.platform == "Windows": #force only version check
+            make_dat(args.p, args.r, None, None, None, False, True, False)
+            return 0
+
         #for early failure instead of failing when trying later
         flips = which('flips')
         xdelta = which('xdelta3')

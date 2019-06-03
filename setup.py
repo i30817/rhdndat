@@ -99,6 +99,7 @@ setup(
 
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
+        'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX :: BSD :: FreeBSD',
 
         'Environment :: Console',

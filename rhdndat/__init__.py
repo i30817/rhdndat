@@ -10,10 +10,9 @@ Please install required libraries. You can install the most recent version with:
 desc_with_version ='''\
 rhdndat {} : www.romhacking.net dat creator
 
-Finds triples (rom file, softpatch file, version file) on the same
-directory and creates a clrmamepro entry on stdout or file for the result of
-each softpatch. It can also serve as a notifier that a update is required by
-comparing local versions to remote romhacking.net versions.
+Finds triples (rom file, softpatch file, version file) on the same directory,
+uses version to check for romhacking.net updates, and creates a clrmamepro entry
+on stdout or file for the result of each softpatch.
 
 A softpatch filename is: 'rom filename - rom extension + patch extension' or
 'rom filename - rom extension + '.reset.xdelta'' (special case for recognizing
@@ -41,7 +40,10 @@ rhdnet dir romtype -t
 rhdnet dir romtype ...
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
-with xdelta) on path or the same directory.'''
+with xdelta) on path or the same directory, unless on a Windows OS.
+
+On windows, rhdndat only checks versions, has no optional arguments and
+bps/xdelta are not required.'''
 desc_with_version = textwrap.dedent(desc_with_version.format(__version__))
 
 desc_search ='''\

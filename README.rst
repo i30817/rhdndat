@@ -4,7 +4,7 @@ rhdndat: romhacking.net_ dat creator and update checker
 .. _romhacking.net: http://www.romhacking.net
 
 
-**rhdndat** finds triples ``(rom file, softpatch file, version file)`` on the same directory and creates a clrmamepro entry on stdout or file for the result of each softpatch. It can also serve as a notifier that a update is required by comparing local versions to remote romhacking.net versions.
+**rhdndat** finds triples ``(rom file, softpatch file, version file)`` on the same directory, uses ``version`` to check for romhacking.net updates, and creates a clrmamepro entry on stdout or file for the result of each softpatch.
 
 | A softpatch filename is:
 | ``rom filename - rom extension + patch extension`` or
@@ -28,7 +28,9 @@ The intended workflow is:
 
 ``rhdnet dir romtype ...``
 
-Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory.
+Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory, unless on a Windows OS.
+
+On windows, rhdndat only checks versions, has no optional arguments and bps/xdelta are not required.
 
 Arguments:
 ----------
