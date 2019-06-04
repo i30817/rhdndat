@@ -23,8 +23,7 @@ This makes rhdndat faster by only checksumming again after version file modifica
 The intended workflow is:
 
 ``rhdnet dir romtype -t``
-
-``<update the patches and version files here>``
+                        check if there are any updates, then update the patches and version files here
 
 then one of two options:
 
@@ -32,7 +31,8 @@ then one of two options:
                         if you want to update the extended attributes of changed version files dirs only
 
 ``rhdnet dir romtype -o hackdat -d nointroxml``
-                        if you want to create or update a retroarch hack dat and take the new names from a nointro xml
+                        if you want to create or update a retroarch hack dat and take the original names
+                        from a nointro xml (used for translations only)
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory, unless on a Windows OS.
 
@@ -50,7 +50,7 @@ positional arguments:
 
 optional arguments:
   -h, --help      show this help message and exit
-  -o output-file  if omitted writes to stdout, if not empty merge entries
+  -o output-file  if omitted writes to stdout, if not empty merge entries,
                   to override a entry, a new entry must list the same
                   romhacking urls as the older entry
 
@@ -71,7 +71,8 @@ optional arguments:
                   if the patches have a romhacking.net hack page, requires -d
 
   -x              recalculate the extended attributes of all rom files even if
-                  the version file is unchanged
+                  the version file is unchanged, useful for silent updates, the
+                  easy way to redo the checksums of files without version files
 
   -s              do not progress beyond setting the extended attributes,
                   exclusive option

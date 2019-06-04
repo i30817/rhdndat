@@ -44,8 +44,9 @@ rhdnet dir romtype -s
                       if you want to update the extended attributes of changed
                       version files dirs only
 rhdnet dir romtype -o hackdat -d nointroxml
-                      if you want to create or update a retroarch hack dat and
-                      take the new names from a nointro xml
+                      if you want to create or update a retroarch hack dat
+                      and take the original names from a nointro xml
+                      (used for translations only)
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work
 with xdelta) on path or the same directory, unless on a Windows OS.
@@ -63,7 +64,7 @@ desc_search = textwrap.dedent(desc_search)
 desc_ext = 'extension (without dot) of roms to find patches for'
 
 desc_output ='''\
-if omitted writes to stdout, if not empty merge entries
+if omitted writes to stdout, if not empty merge entries,
 to override a entry, a new entry must list the same
 romhacking urls as the older entry
 
@@ -96,7 +97,8 @@ desc_ignore = textwrap.dedent(desc_ignore)
 
 desc_forcexattr ='''\
 recalculate the extended attributes of all rom files even if
-the version file is unchanged
+the version file is unchanged, useful for silent updates, the
+easy way to redo the checksums of files without version files
 
 '''
 desc_forcexattr = textwrap.dedent(desc_forcexattr)

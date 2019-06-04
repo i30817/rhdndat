@@ -423,7 +423,11 @@ def get_romhacking_data(rom, possible_metadata):
     return (metadata, language)
 
 def get_dat_rom_name(dat, dat_crc32):
-    dat_rom = dat.find('rom', crc=dat_crc32)
+    upper_case = dat_crc32.upper() #argument is lowercase
+    def ignorecase(crc):
+        return crc == dat_crc32 or crc == upper_case
+
+    dat_rom = dat.find('rom', crc=ignorecase)
     if dat_rom:
         return dat_rom.parent['name']
     return None
@@ -711,12 +715,10 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 known_rom = False
                 if dat:
                     #if the file was irreversibly patched or unknown this will fail
-                    known_rom = get_dat_rom_name(dat, crc) or get_dat_rom_name(dat, crc.upper())
-
+                    known_rom = get_dat_rom_name(dat, crc)
                     #the original rom title
                     original_rom_title = get_dat_rom_name(dat, orig_crc)
-                    if not original_rom_title: #some dats have uppercase checksums
-                        original_rom_title = get_dat_rom_name(dat, orig_crc.upper())
+
                     if unknown_remove and not original_rom_title:
                         raise UnrecognizedRomError(orig_crc)
 
