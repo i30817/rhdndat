@@ -18,7 +18,7 @@ If there is no patch file, but a version file exists, the extension matches, and
 
 During normal operation, for all roms rhdndat stores extended attributes ``user.rom.md5``, ``user.rom.crc32`` and ``user.rom.sha1`` in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch.
 
-This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` option.
+This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` or ``-f`` options.
 
 The intended workflow is:
 
@@ -26,11 +26,17 @@ The intended workflow is:
 
 ``<update the patches and version files here>``
 
-``rhdnet dir romtype ...``
+then one of two options:
+
+``rhdnet dir romtype -f``
+                        if you want to update the extended attributes of changed version files dirs only
+
+``rhdnet dir romtype -o hackdat -d nointroxml``
+                        if you want to create or update a retroarch hack dat and take the new names from a nointro xml
 
 Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory, unless on a Windows OS.
 
-On windows, rhdndat only checks versions, has no optional arguments and bps/xdelta are not required.
+On windows, rhdndat only checks versions, has no optional arguments and flips/xdelta are not required.
 
 Arguments:
 ----------
@@ -65,9 +71,13 @@ optional arguments:
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
 
-  -x              forces recalculation of the extended attributes even to files
-                  without a version file, for if you updated a rom file outside
-                  of the rhdndat system
+  -x              skip everything but a recalculation of the extended attributes
+                  of all matching rom files (it's recommended to do this only on
+                  a dir with a silent patch update or without a version file),
+                  exclusive option
+
+  -f              skip everything but a recalculation of the extended attributes
+                  if the version file changed, exclusive option
 
   -t              only test version numbers against remote version,
                   works without a patch present, exclusive option
