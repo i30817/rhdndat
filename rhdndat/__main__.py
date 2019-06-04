@@ -590,7 +590,43 @@ def write_to_file(file, hacks, merge_dat):
     for hack in hacks:
         file.write(str(hack))
 
-def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, forcexattr, forceversionxattr):
+def get_checksums(patch, rom, skip_bytes):
+    checksums_generator = get_checksums()
+    if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
+        size, crc, md5, sha1 = patch_producer(patch, rom, checksums_generator)
+        dat_crc32 = file_producer(rom, get_crc32(skip_bytes))
+    else: #possible hardpatch (with reset or not) or just normal file of the right type
+        size, crc, md5, sha1 = file_producer(rom, checksums_generator)
+        if patch:
+            dat_crc32 = patch_producer(patch, rom, get_crc32(skip_bytes))
+        else: #normal file or hardpatch without reset
+            dat_crc32 = crc
+    return dat_crc32, size, crc, md5, sha1
+
+def all_there(x):
+    return ('user.rom.size' in x
+        and 'user.rom.crc32' in x
+        and 'user.rom.md5' in x
+        and 'user.rom.sha1' in x
+        and 'user.rom.crc32_source' in x)
+
+def read(x):
+    size = int(x['user.rom.size'].decode('ascii'))
+    crc  = x['user.rom.crc32'].decode('ascii')
+    md5  = x['user.rom.md5'].decode('ascii')
+    sha1 = x['user.rom.sha1'].decode('ascii')
+    dat_crc32 = x['user.rom.crc32_source'].decode('ascii')
+    return dat_crc32, size, crc, md5, sha1
+
+def store(x, dat_crc32, size, crc, md5, sha1):
+    x['user.rom.size'] = str(size).encode('ascii')
+    x['user.rom.crc32'] = crc.encode('ascii')
+    x['user.rom.md5'] = md5.encode('ascii')
+    x['user.rom.sha1'] = sha1.encode('ascii')
+    x['user.rom.crc32_source'] = dat_crc32.encode('ascii')
+
+
+def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, forcexattr, bailout):
     skip_bytes = 0
     dat = None
     if dat_file:
@@ -630,65 +666,40 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                 if len(patches) > 1:
                     raise NonFatalError('multiple possible patches found')
 
-                version_id = b''
-                if metadata_exists:
-                    version_id = read_version_file(possible_metadata)[0].encode('ascii')
-
                 #this assumes that multiple hacks were already glued into a single softpatch if there are multiple urls
                 patch = None
                 if patches:
                     patch = patches[0]
 
-                def all_there(x):
-                    return ('user.rom.size' in x
-                        and 'user.rom.crc32' in x
-                        and 'user.rom.md5' in x
-                        and 'user.rom.sha1' in x
-                        and 'user.rhdndat.version_id' in x
-                        and 'user.rhdndat.crc32_source')
-
                 ###find checksums of the 'final' patched file and the original if possible###
-
-
-                forced = forcexattr or (forceversionxattr and metadata_exists)
-                reused_xattr = False
-                if xattr_available:
+                if not xattr_available:
+                    dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
+                elif not metadata_exists:
                     x = xattr.xattr(absolute_rom)
-                    #unless forced, this reuses checksums if the version ids match or there is no version file
-                    if not forced and all_there(x) and (not metadata_exists or version_id == x['user.rhdndat.version_id']):
-                        size = int(x['user.rom.size'].decode('ascii'))
-                        crc  = x['user.rom.crc32'].decode('ascii')
-                        md5  = x['user.rom.md5'].decode('ascii')
-                        sha1 = x['user.rom.sha1'].decode('ascii')
-                        dat_crc32 = x['user.rhdndat.crc32_source'].decode('ascii')
-                        reused_xattr = True
-                if not reused_xattr:
-                    checksums_generator = get_checksums()
-                    if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
-                        size, crc, md5, sha1 = patch_producer(patch, absolute_rom, checksums_generator)
-                        dat_crc32 = file_producer(absolute_rom, get_crc32(skip_bytes))
-                    else: #possible hardpatch (with reset or not) or just normal file of the right type
-                        size, crc, md5, sha1 = file_producer(absolute_rom, checksums_generator)
-                        if patch:
-                            dat_crc32 = patch_producer(patch, absolute_rom, get_crc32(skip_bytes))
-                        else: #normal file or hardpatch without reset
-                            dat_crc32 = crc
-                    #store
-                    if xattr_available:
-                        attr = xattr.xattr(absolute_rom)
-                        attr['user.rom.size'] = str(size).encode('ascii')
-                        attr['user.rom.crc32'] = crc.encode('ascii')
-                        attr['user.rom.md5'] = md5.encode('ascii')
-                        attr['user.rom.sha1'] = sha1.encode('ascii')
-                        attr['user.rhdndat.version_id'] = version_id #already binary
-                        attr['user.rhdndat.crc32_source'] = dat_crc32.encode('ascii')
+                    if not forcexattr and all_there(x):
+                        dat_crc32, size, crc, md5, sha1 = read(x)
+                    else:
+                        dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
+                        store(x, dat_crc32, size, crc, md5, sha1)
+                elif metadata_exists:
+                    verX = xattr.xattr(possible_metadata)
+                    version_id = read_version_file(possible_metadata)[0].encode('ascii')
+                    version_match = 'user.rhdndat.version_id' in verX and verX['user.rhdndat.version_id'] == version_id
+                    x = xattr.xattr(absolute_rom)
+
+                    if not forcexattr and version_match and all_there(x):
+                        dat_crc32, size, crc, md5, sha1 = read(x)
+                    else:
+                        dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
+                        store(x, dat_crc32, size, crc, md5, sha1)
+                        if not version_match:
+                            verX['user.rhdndat.version_id'] = version_id
                         log('info: {} : stored checksums as extended attributes'.format(rom))
 
-                if patch and not metadata_exists:
-                    warn("warn: {} : has patch without a version file".format(rom))
-
                 #after xattr there is no longer any need to process files in these cases
-                if forced or not metadata_exists:
+                if bailout or not metadata_exists:
+                    if not metadata_exists and patch:
+                        warn("warn: {} : has patch without a version file".format(rom))
                     continue
 
                 ###find the original rom title on dat###
@@ -750,10 +761,10 @@ def parse_args():
         parser.add_argument('-i', action='store_true', help=desc_ignore)
         if xattr_available:
             parser.add_argument('-x', action='store_true', help=desc_forcexattr)
-            parser.add_argument('-f', action='store_true', help=desc_forceversionxattr)
+            parser.add_argument('-s', action='store_true', help=desc_bailout)
         else:
             parser.add_argument('-x', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
-            parser.add_argument('-f', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
+            parser.add_argument('-s', action='store_const', const=False, default=False, help=argparse.SUPPRESS)
         parser.add_argument('-t', action='store_true', help=desc_check)
     return parser
 
@@ -773,14 +784,11 @@ def main():
         if args.i and not args.d:
             error("error: -i option requires -d option to whitelist roms on the dat")
             return 1
-        if args.t and (args.o or args.d or args.i or args.x or args.f):
+        if args.t and (args.o or args.d or args.i or args.x or args.s):
             error("error: -t option can't be used with other options")
             return 1
-        if args.x and (args.o or args.d or args.i or args.f or args.t):
-            error("error: -x option can't be used with other options")
-            return 1
-        if args.f and (args.o or args.d or args.i or args.x or args.t):
-            error("error: -f option can't be used with other options")
+        if args.s and (args.o or args.d or args.i or args.x or args.t):
+            error("error: -s option can't be used with other options")
             return 1
 
         #'a+' opens for reading and writing, creating if necessary in append mode
@@ -793,7 +801,7 @@ def main():
         else:
             dat = None
 
-        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x, args.f)
+        make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x, args.s)
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: {} parsing dat : {}".format(args.m.name, e))
         return 1

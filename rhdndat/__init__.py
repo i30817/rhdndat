@@ -31,7 +31,7 @@ user.rom.md5, user.rom.crc32 and user.rom.sha1 in the rom file, and these
 checksums refer to the 'patched' file, even if the patch is a softpatch.
 
 This makes rhdndat faster by only checksumming again after version file
-modification or after using the -x or -f options.
+modification or after using the -x option.
 
 The intended workflow is:
 
@@ -40,7 +40,7 @@ rhdnet dir romtype -t
 
 then one of two options:
 
-rhdnet dir romtype -f
+rhdnet dir romtype -s
                       if you want to update the extended attributes of changed
                       version files dirs only
 rhdnet dir romtype -o hackdat -d nointroxml
@@ -95,20 +95,18 @@ have a romhacking.net hack page, requires -d
 desc_ignore = textwrap.dedent(desc_ignore)
 
 desc_forcexattr ='''\
-skip everything but a recalculation of the extended attributes
-of all matching rom files (it's recommended to do this only on
-a dir with a silent patch update or without a version file),
-exclusive option
+recalculate the extended attributes of all rom files even if
+the version file is unchanged
 
 '''
 desc_forcexattr = textwrap.dedent(desc_forcexattr)
 
-desc_forceversionxattr ='''\
-skip everything but a recalculation of the extended attributes
-if the version file changed, exclusive option
+desc_bailout ='''\
+do not progress beyond setting the extended attributes,
+exclusive option
 
 '''
-desc_forcexattr = textwrap.dedent(desc_forceversionxattr)
+desc_bailout = textwrap.dedent(desc_bailout)
 
 desc_check ='''\
 only test version numbers against remote version,

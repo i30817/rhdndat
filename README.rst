@@ -18,7 +18,7 @@ If there is no patch file, but a version file exists, the extension matches, and
 
 During normal operation, for all roms rhdndat stores extended attributes ``user.rom.md5``, ``user.rom.crc32`` and ``user.rom.sha1`` in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch.
 
-This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` or ``-f`` options.
+This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` option.
 
 The intended workflow is:
 
@@ -28,7 +28,7 @@ The intended workflow is:
 
 then one of two options:
 
-``rhdnet dir romtype -f``
+``rhdnet dir romtype -s``
                         if you want to update the extended attributes of changed version files dirs only
 
 ``rhdnet dir romtype -o hackdat -d nointroxml``
@@ -41,7 +41,7 @@ On windows, rhdndat only checks versions, has no optional arguments and flips/xd
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-x] [-f] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-x] [-s] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -70,13 +70,11 @@ optional arguments:
   -i              don't allow unrecognized roms to be added even if the patches
                   have a romhacking.net hack page, requires -d
 
-  -x              skip everything but a recalculation of the extended attributes
-                  of all matching rom files (it's recommended to do this only on
-                  a dir with a silent patch update or without a version file),
-                  exclusive option
+  -x              recalculate the extended attributes of all rom files even if
+                  the version file is unchanged
 
-  -f              skip everything but a recalculation of the extended attributes
-                  if the version file changed, exclusive option
+  -s              do not progress beyond setting the extended attributes,
+                  exclusive option
 
   -t              only test version numbers against remote version,
                   works without a patch present, exclusive option
