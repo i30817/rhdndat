@@ -41,7 +41,7 @@ On windows, rhdndat only checks versions, has no optional arguments and flips/xd
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-o **merge-file**] [-d **xml-file**] [-i] [-x] [-t] **search-path** **rom-type**
+**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-x] [-f] [-t] **search-path** **rom-type**
 
 positional arguments:
   -search-path     directory tree to search for (rom, patches and version) files
@@ -50,8 +50,7 @@ positional arguments:
 
 optional arguments:
   -h, --help      show this help message and exit
-  -o output-file  output file, if omitted writes to stdout
-  -m merge-file   merge non-overridden entries from this source file
+  -o output-file  if omitted writes to stdout, if not empty merge entries
                   to override a entry, a new entry must list the same
                   romhacking urls as the older entry
 

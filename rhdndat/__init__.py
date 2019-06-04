@@ -62,15 +62,13 @@ desc_search = textwrap.dedent(desc_search)
 
 desc_ext = 'extension (without dot) of roms to find patches for'
 
-desc_output = 'output file, if omitted writes to stdout'
-
-desc_merge ='''\
-merge non-overridden entries from this source file
+desc_output ='''\
+if omitted writes to stdout, if not empty merge entries
 to override a entry, a new entry must list the same
 romhacking urls as the older entry
 
 '''
-desc_merge = textwrap.dedent(desc_merge)
+desc_output = textwrap.dedent(desc_output)
 
 desc_xml ='''\
 normally the name is from the romhacking.net hack page,

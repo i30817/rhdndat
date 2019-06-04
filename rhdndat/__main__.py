@@ -744,10 +744,8 @@ def parse_args():
     parser.add_argument('p', metavar=('search-path'), type=searchpath_is_dir, help=desc_search)
     parser.add_argument('r', metavar=('rom-type'), type=no_dot_in_extension, help=desc_ext)
 
-    if platform.platform != "Windows": #options not compatible for lack of anonymous fifo
-        #dont clobber file because we may read from it in -m. move tmpfile over it later
+    if platform.platform != "Windows": #options not compatible for lack of anonymous fifo and xattr
         parser.add_argument('-o', metavar=('output-file'), type=FileType('a+', encoding='utf-8'), help=desc_output)
-        parser.add_argument('-m', metavar=('merge-file'), type=FileType('r', encoding='utf-8'), help=desc_merge)
         parser.add_argument('-d', metavar=('xml-file'), type=FileType('r', encoding='utf-8'), help=desc_xml)
         parser.add_argument('-i', action='store_true', help=desc_ignore)
         if xattr_available:
@@ -775,17 +773,26 @@ def main():
         if args.i and not args.d:
             error("error: -i option requires -d option to whitelist roms on the dat")
             return 1
-        if args.t and (args.o or args.m or args.d or args.i or args.x or args.f):
+        if args.t and (args.o or args.d or args.i or args.x or args.f):
             error("error: -t option can't be used with other options")
             return 1
-        if args.x and (args.o or args.m or args.d or args.i or args.f or args.t):
+        if args.x and (args.o or args.d or args.i or args.f or args.t):
             error("error: -x option can't be used with other options")
             return 1
-        if args.f and (args.o or args.m or args.d or args.i or args.x or args.t):
+        if args.f and (args.o or args.d or args.i or args.x or args.t):
             error("error: -f option can't be used with other options")
             return 1
 
-        dat = None if not args.m else hack_dat(args.m)
+        #'a+' opens for reading and writing, creating if necessary in append mode
+        #seek to zero to read entries. If it all reads well, and processes well,
+        #a new file will be moved over this file. Why not 'r'? To prevent user
+        #giving '-' (stdout) and expecting it to work. Ommiting -o will write to stdout
+        if args.o:
+            args.o.seek(0)
+            dat = hack_dat(args.o)
+        else:
+            dat = None
+
         make_dat(args.p, args.r, args.o, dat, args.d, args.i, args.t, args.x, args.f)
     except ParseException as e: #fail early for parsing this to prevent data loss
         error("error: {} parsing dat : {}".format(args.m.name, e))
