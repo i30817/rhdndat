@@ -75,7 +75,7 @@ optional arguments:
                   easy way to redo the checksums of files without version files
 
   -s              do not progress beyond setting the extended attributes,
-                  exclusive option
+                  exclusive option, except for -x
 
   -t              only test version numbers against remote version,
                   works without a patch present, exclusive option

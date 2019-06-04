@@ -796,8 +796,8 @@ def main():
         if args.t and (args.o or args.d or args.i or args.x or args.s):
             error("error: -t option can't be used with other options")
             return 1
-        if args.s and (args.o or args.d or args.i or args.x or args.t):
-            error("error: -s option can't be used with other options")
+        if args.s and (args.o or args.d or args.i or args.t):
+            error("error: -s option can't be used with options other than -x")
             return 1
 
         #'a+' opens for reading and writing, creating if necessary in append mode

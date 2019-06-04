@@ -1,4 +1,4 @@
-__version__ = '1.6.3'
+__version__ = '1.6.4'
 
 import textwrap
 
@@ -105,7 +105,7 @@ desc_forcexattr = textwrap.dedent(desc_forcexattr)
 
 desc_bailout ='''\
 do not progress beyond setting the extended attributes,
-exclusive option
+exclusive option, except for -x
 
 '''
 desc_bailout = textwrap.dedent(desc_bailout)
