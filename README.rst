@@ -67,8 +67,8 @@ optional arguments:
                   it's your responsibility to use a dat that matches the
                   game/set you're scanning to avoid false unknowns
 
-  -i              don't allow unrecognized roms to be added even if the patches
-                  have a romhacking.net hack page, requires -d
+  -i              don't allow roms with unknown original name to be added even
+                  if the patches have a romhacking.net hack page, requires -d
 
   -x              recalculate the extended attributes of all rom files even if
                   the version file is unchanged

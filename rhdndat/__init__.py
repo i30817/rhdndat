@@ -1,4 +1,4 @@
-__version__ = '1.6.2'
+__version__ = '1.6.3'
 
 import textwrap
 
@@ -88,8 +88,8 @@ game/set you're scanning to avoid false unknowns
 desc_xml = textwrap.dedent(desc_xml)
 
 desc_ignore ='''\
-don\'t allow unrecognized roms to be added even if the patches
-have a romhacking.net hack page, requires -d
+don\'t allow roms with unknown original name to be added even
+if the patches have a romhacking.net hack page, requires -d
 
 '''
 desc_ignore = textwrap.dedent(desc_ignore)

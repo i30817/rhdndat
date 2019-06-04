@@ -590,7 +590,7 @@ def write_to_file(file, hacks, merge_dat):
     for hack in hacks:
         file.write(str(hack))
 
-def get_checksums(patch, rom, skip_bytes):
+def checksums_strategy(patch, rom, skip_bytes):
     checksums_generator = get_checksums()
     if patch and not patch.endswith('.reset.xdelta'): #actual softpatch
         size, crc, md5, sha1 = patch_producer(patch, rom, checksums_generator)
@@ -600,22 +600,25 @@ def get_checksums(patch, rom, skip_bytes):
         if patch:
             dat_crc32 = patch_producer(patch, rom, get_crc32(skip_bytes))
         else: #normal file or hardpatch without reset
-            dat_crc32 = crc
+            dat_crc32 =  crc
     return dat_crc32, size, crc, md5, sha1
 
 def all_there(x):
     return ('user.rom.size' in x
         and 'user.rom.crc32' in x
         and 'user.rom.md5' in x
-        and 'user.rom.sha1' in x
-        and 'user.rom.crc32_source' in x)
+        and 'user.rom.sha1' in x)
+        #and 'user.rom.crc32_source' in x)
 
 def read(x):
     size = int(x['user.rom.size'].decode('ascii'))
     crc  = x['user.rom.crc32'].decode('ascii')
     md5  = x['user.rom.md5'].decode('ascii')
     sha1 = x['user.rom.sha1'].decode('ascii')
-    dat_crc32 = x['user.rom.crc32_source'].decode('ascii')
+    try:
+        dat_crc32 = x['user.rom.crc32_source'].decode('ascii')
+    except KeyError as _:
+        dat_crc32 = crc
     return dat_crc32, size, crc, md5, sha1
 
 def store(x, dat_crc32, size, crc, md5, sha1):
@@ -623,7 +626,8 @@ def store(x, dat_crc32, size, crc, md5, sha1):
     x['user.rom.crc32'] = crc.encode('ascii')
     x['user.rom.md5'] = md5.encode('ascii')
     x['user.rom.sha1'] = sha1.encode('ascii')
-    x['user.rom.crc32_source'] = dat_crc32.encode('ascii')
+    if dat_crc32 != crc:
+        x['user.rom.crc32_source'] = dat_crc32.encode('ascii')
 
 
 def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remove, test_versions_only, forcexattr, bailout):
@@ -639,6 +643,7 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
     romtypes   = ['.'+romtype, '.'+romtype.upper(), '.'+romtype.lower()]
 
     hacks = []
+
     for dirpath, _, files in os.walk(os.path.abspath(searchdir)):
         for rom in files:
 
@@ -673,14 +678,14 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
 
                 ###find checksums of the 'final' patched file and the original if possible###
                 if not xattr_available:
-                    dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
+                    orig_crc, size, crc, md5, sha1 = checksums_strategy(patch, absolute_rom, skip_bytes)
                 elif not metadata_exists:
                     x = xattr.xattr(absolute_rom)
                     if not forcexattr and all_there(x):
-                        dat_crc32, size, crc, md5, sha1 = read(x)
+                        orig_crc, size, crc, md5, sha1 = read(x)
                     else:
-                        dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
-                        store(x, dat_crc32, size, crc, md5, sha1)
+                        orig_crc, size, crc, md5, sha1 = checksums_strategy(patch, absolute_rom, skip_bytes)
+                        store(x, orig_crc, size, crc, md5, sha1)
                 elif metadata_exists:
                     verX = xattr.xattr(possible_metadata)
                     version_id = read_version_file(possible_metadata)[0].encode('ascii')
@@ -688,10 +693,10 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                     x = xattr.xattr(absolute_rom)
 
                     if not forcexattr and version_match and all_there(x):
-                        dat_crc32, size, crc, md5, sha1 = read(x)
+                        orig_crc, size, crc, md5, sha1 = read(x)
                     else:
-                        dat_crc32, size, crc, md5, sha1 = get_checksums(patch, absolute_rom, skip_bytes)
-                        store(x, dat_crc32, size, crc, md5, sha1)
+                        orig_crc, size, crc, md5, sha1 = checksums_strategy(patch, absolute_rom, skip_bytes)
+                        store(x, orig_crc, size, crc, md5, sha1)
                         if not version_match:
                             verX['user.rhdndat.version_id'] = version_id
                         log('info: {} : stored checksums as extended attributes'.format(rom))
@@ -702,25 +707,27 @@ def make_dat(searchdir, romtype, output_file, merge_dat, dat_file, unknown_remov
                         warn("warn: {} : has patch without a version file".format(rom))
                     continue
 
-                ###find the original rom title on dat###
-                rom_title = None
+                original_rom_title = None
+                known_rom = False
                 if dat:
                     #if the file was irreversibly patched or unknown this will fail
-                    rom_title = get_dat_rom_name(dat, dat_crc32.lower())
-                    if not rom_title: #some dats have uppercase checksums
-                        rom_title = get_dat_rom_name(dat, dat_crc32.upper())
+                    known_rom = get_dat_rom_name(dat, crc) or get_dat_rom_name(dat, crc.upper())
 
-                    if unknown_remove and not rom_title:
-                        raise UnrecognizedRomError(dat_crc32)
+                    #the original rom title
+                    original_rom_title = get_dat_rom_name(dat, orig_crc)
+                    if not original_rom_title: #some dats have uppercase checksums
+                        original_rom_title = get_dat_rom_name(dat, orig_crc.upper())
+                    if unknown_remove and not original_rom_title:
+                        raise UnrecognizedRomError(orig_crc)
 
                 #Files can be in same directory, part of the same game and with
                 #the same extension, and not patched at all (cd music tracks), filter
-                if patch or (dat and not rom_title):
-                    if not patch and not rom_title:
-                        log("info: {} : no patch and crc32 {} not found in dat, assume a hardpatch".format(rom, dat_crc32))
+                if patch or (dat and not known_rom):
+                    if not patch and not known_rom:
+                        log("info: {} : no patch and crc32 {} not found in dat, assume a hardpatch".format(rom, crc))
                     metadata, language = get_romhacking_data(rom, possible_metadata)
                     #we don't process this now for merge-dat to work
-                    hack = Hack.fromRhdnet(metadata,language,rom_title,rom,size,crc,md5,sha1)
+                    hack = Hack.fromRhdnet(metadata,language,original_rom_title,rom,size,crc,md5,sha1)
                     hacks.append(hack)
             except UnrecognizedRomError as e:
                 warn('skip: {} : crc {} not in dat file'.format(rom, e.crc))
