@@ -22,9 +22,12 @@ except Exception as e:
     print(libraries_error, file=sys.stderr)
     sys.exit(1)
 
-xattr_available = importlib.util.find_spec('xattr') is not None
-if xattr_available:
+xattr_available = False
+try:
+    xattr_available = importlib.util.find_spec('xattr') is not None
     import xattr
+except Exception as e:
+    pass
 
 from bs4 import BeautifulSoup
 from pyparsing import *
