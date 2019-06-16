@@ -1,4 +1,4 @@
-__version__ = '1.6.5'
+__version__ = '1.6.6'
 
 import textwrap
 
@@ -8,7 +8,7 @@ Please install required libraries. You can install the most recent version with:
 \tpip3 install --user beautifulsoup4 lxml pyparsing colorama xattr'''
 
 desc_with_version ='''\
-rhdndat {} : www.romhacking.net dat creator
+rhdndat {} : www.romhacking.net dat creator and update checker
 
 Finds triples (rom file, softpatch file, version file) on the same directory,
 uses version to check for romhacking.net updates, and creates a clrmamepro entry

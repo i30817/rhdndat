@@ -13,11 +13,12 @@ from io import DEFAULT_BUFFER_SIZE
 from rhdndat.__init__ import *
 
 import importlib
+from importlib import util
 try:
-    assert importlib.util.find_spec('bs4') is not None
-    assert importlib.util.find_spec('lxml') is not None
-    assert importlib.util.find_spec('pyparsing') is not None
-    assert importlib.util.find_spec('colorama') is not None
+    assert util.find_spec('bs4') is not None
+    assert util.find_spec('lxml') is not None
+    assert util.find_spec('pyparsing') is not None
+    assert util.find_spec('colorama') is not None
 except Exception as e:
     print(libraries_error, file=sys.stderr)
     sys.exit(1)
