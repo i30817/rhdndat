@@ -61,8 +61,8 @@ optional arguments:
 
                   this allows adding unknown roms without a patch, which
                   can't normally be added for safety, albeit with the
-                  romhacking page name (the dat blacklists the known
-                  files, such as music tracks in cd games)
+                  romhacking name (the dat blacklists the known files,
+                  such as music tracks in cd games)
 
                   it's your responsibility to use a dat that matches the
                   game/set you're scanning to avoid known files
