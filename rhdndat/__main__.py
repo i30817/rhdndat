@@ -424,6 +424,8 @@ def get_romhacking_data(rom, possible_metadata):
                 warn(' file:  {}'.format(f))
         except urllib.error.URLError as e:
             raise VersionFileURLError(possible_metadata, url)
+        except AttributeError as e:
+        	raise NonFatalError('error getting romhacking page information')
     return (metadata, language)
 
 def get_dat_rom_name(dat, dat_crc32):
