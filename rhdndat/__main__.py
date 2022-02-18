@@ -380,7 +380,7 @@ def get_romhacking_data(rom, possible_metadata):
             #warn the user to verify if he might have to remove the hack from the merge file
             check_removed = soup.find('div', id='main')
             if check_removed:
-                check_removed = check_removed.find('div', class_='topbar', string='RHDN Error Encountered!')
+                check_removed = check_removed.find('div', class_='topbar', string='Error Encountered!')
                 if check_removed:
                     raise RHDNTRomRemovedError(url)
 
