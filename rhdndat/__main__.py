@@ -217,7 +217,7 @@ def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     if should_store:
                         sha1_checksum = producer_unix([xdelta, '-d', '-s',  rom, patch],  generator)
                         store(x, sha1_checksum)
-                   python -m pip install --upgrade --force-reinstall else:
+                    else:
                         sha1_checksum = read(x)
                 else:
                     if should_store:
