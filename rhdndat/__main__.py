@@ -129,9 +129,6 @@ def producer_windows(arguments, generator_function):
         for byt in iter(lambda:f.read(DEFAULT_BUFFER_SIZE), b''):
             generator_function.send(byt)
         return generator_function.send([])
-            
-
-
 
 def read(x):
     return x['user.rhdndat.rom_sha1'].decode('ascii')
@@ -163,7 +160,7 @@ def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     try:
         xdelta = which('xdelta3')
     except EXENotFoundError as e:
-        error('error: rhdndat needs xdelta3 on its location, the current dir, or the OS path')
+        error(f'error: rhdndat needs xdelta3 on its location, the current dir, or the OS path')
         raise typer.Abort()
     
     xmls = datdir.glob('**/*.dat')
@@ -421,11 +418,11 @@ def get_romhacking_data(possible_metadata):
             tmp  = info.find('th', string='Language')
             tmp  = tmp and tmp.nextSibling.string
             if tmp and language and tmp != language:
-                warn('warn: {}->{} : language should not have changed twice with patches from romhacking.net'.format(language,tmp))
+                warn(f'warn: {language}->{tmp} : language should not have changed twice with patches from romhacking.net')
                 p = Path(os.path.dirname(possible_metadata)).as_uri()
                 f = Path(possible_metadata).as_uri()
-                warn(' path:  {}'.format(p))
-                warn(' file:  {}'.format(f))
+                warn(f' path:  {p}')
+                warn(f' file:  {f}')
             if tmp:
                 language = tmp
 
@@ -450,9 +447,9 @@ def get_romhacking_data(possible_metadata):
                 raise VersionFileURLError(possible_metadata, url)
 
             if remote_version != version:
-                warn("warn: local '{version}' != upstream '{remote_version}' versions")
-                warn(' patch: {url}')
-                warn(' path:  {possible_metadata.parent.as_uri()}')
+                warn(f'warn: local '{version}' != upstream '{remote_version}' versions')
+                warn(f' patch: {url}')
+                warn(f' path:  {possible_metadata.parent.as_uri()}')
         except (urllib.error.URLError, AttributeError) as e:
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
@@ -466,20 +463,20 @@ def mainaux2(romdir: Path = typer.Argument(..., exists=True, file_okay=False, di
                get_romhacking_data(possible_metadata)
             #non fatal errors
             except NonFatalError as e:
-                warn('skip: {e}')
+                warn(f'skip: {e}')
             except RHDNTRomRemovedError as e:
-                warn('skip: romhacking.net deleted patch, check reason and delete last version from dat if bad')
-                warn(' patch: {e.url}')
-                warn(' path:  {e.versionfile.parent.as_uri()}')
+                warn(f'skip: romhacking.net deleted patch, check reason and delete last version from dat if bad')
+                warn(f' patch: {e.url}')
+                warn(f' path:  {e.versionfile.parent.as_uri()}')
     #fatal errors
     except VersionFileURLError as e:
-        error('error: version file url connection failure')
-        error(' file: {}'.format(Path(e.versionfile).as_uri()))
-        error(' url:  {}'.format(e.url))
+        error(f'error: version file url connection failure')
+        error(f' file: {Path(e.versionfile).as_uri()}')
+        error(f' url:  {e.url}')
         raise typer.Abort()
     except VersionFileSyntaxError as e:
-        error('error: version files repeat two lines, a version string and a romhacking url')
-        error(' file: {}'.format(Path(e.versionfile).as_uri()))
+        error(f'error: version files repeat two lines, a version string and a romhacking url')
+        error(f' file: {Path(e.versionfile).as_uri()}')
         raise typer.Abort()
 
 def rename():
