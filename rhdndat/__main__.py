@@ -152,6 +152,9 @@ def dictsetsum(dict1, dict2):
         dict1[x] = dict1.setdefault(x, list()) + s
     return dict1
 
+#this method might rename files.
+#since we use dats to get the possible new filenames from the 'rom name' entry
+#it shouldn't be possible to end up with illegal characters on windows though, unless i'm missing something.
 def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             datdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for xml dat files to use as source of new names.'),
             force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
