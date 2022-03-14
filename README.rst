@@ -91,13 +91,13 @@ The project can be installed with pip3 but you'll have to provide your own xdelt
 In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install `Scripts`` directory if you installed with the path option selected is enough.
 
 
-+---------------------+------------------------------------------------------------------------------------------------------------+
-| Linux               | ``pip3 install --upgrade --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip``          |
-+---------------------+------------------------------------------------------------------------------------------------------------+
++---------------------+--------------------------------------------------------------------------------------------------+
+| Linux               | ``pip3 install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip``          |
++---------------------+--------------------------------------------------------------------------------------------------+
 | Windows             | ``python -m pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
-+---------------------+------------------------------------------------------------------------------------------------------------+
-| Run in Windows      | ``python PYTHON_INSTALL_DIR\Scripts\rhdndat or python PYTHON_INSTALL_DIR\Scripts\rhdndat-rn``              |
-+---------------------+------------------------------------------------------------------------------------------------------------+
++---------------------+--------------------------------------------------------------------------------------------------+
+| Run in Windows      | ``python PYTHON_INSTALL_DIR\Scripts\rhdndat or python PYTHON_INSTALL_DIR\Scripts\rhdndat-rn``    |
++---------------------+--------------------------------------------------------------------------------------------------+
 
 
 
