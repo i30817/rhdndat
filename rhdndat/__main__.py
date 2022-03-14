@@ -122,7 +122,7 @@ def producer_windows(arguments, generator_function):
     with tempfile.TemporaryDirectory() as d:
         patched = Path(d,'rhdndat.tmp')
         arguments.append(patched)
-        with subprocess.run(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
+        with subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
             #if a error occurred avoid writing bogus checksums
             if process.returncode != 0:
                 raise NonFatalError('error during patching')
