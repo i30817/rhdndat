@@ -205,7 +205,7 @@ def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             patch = rom.with_suffix('.rxdelta')
             #can't use xattr and the pipe version of xdelta subprocess
-            if os.name == 'nt'::
+            if os.name == 'nt':
                 if patch.is_file():
                    sha1_checksum = producer_windows([xdelta, '-d', '-s',  rom, patch],  generator)
                 else:
