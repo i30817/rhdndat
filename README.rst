@@ -105,7 +105,7 @@ Credits
 | Alcaro for helpful comments and for flips      | https://github.com/Alcaro/Flips                |
 +------------------------------------------------+------------------------------------------------+
 | windows xdelta, remember to rename to xdelta3  | https://github.com/jmacd/xdelta-gpl/releases   |
-+-------------------------------------------------------+-----------------------------------------+
++------------------------------------------------+------------------------------------------------+
 | romhacking.net for being a awesome resource    | http://www.romhacking.net/                     |
 +------------------------------------------------+------------------------------------------------+
 
