@@ -86,7 +86,9 @@ rhdndat may fail to execute if your OS doesn't add the pip3 install dir ``~/.loc
 
 In windows, you'll want to check the option to “Add Python to PATH” when installing python. 
 
-The project can be installed with pip3 but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn, in linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install `Scripts`` directory if you installed with the path option selected is enough.
+The project can be installed with pip3 but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
+
+In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install `Scripts`` directory if you installed with the path option selected is enough.
 
 
 +--------+------------------------------------------------------------------------------+
@@ -99,13 +101,13 @@ Credits
 
 .. class:: tablacreditos
 
-+-------------------------------------------------------+------------------------------------------------+
-| Alcaro for helpful comments and for flips             | https://github.com/Alcaro/Flips                |
-+-------------------------------------------------------+------------------------------------------------+
-| latest windows xdelta, remember to rename to xdelta3  | https://github.com/jmacd/xdelta-gpl/releases   |
-+-------------------------------------------------------+------------------------------------------------+
-| romhacking.net for being a awesome resource           | http://www.romhacking.net/                     |
-+-------------------------------------------------------+------------------------------------------------+
++------------------------------------------------+------------------------------------------------+
+| Alcaro for helpful comments and for flips      | https://github.com/Alcaro/Flips                |
++------------------------------------------------+------------------------------------------------+
+| windows xdelta, remember to rename to xdelta3  | https://github.com/jmacd/xdelta-gpl/releases   |
++-------------------------------------------------------+-----------------------------------------+
+| romhacking.net for being a awesome resource    | http://www.romhacking.net/                     |
++------------------------------------------------+------------------------------------------------+
 
 `The source for this project is available here
 <https://github.com/i30817/rhdndat>`_.
