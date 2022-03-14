@@ -3,7 +3,7 @@ name = "rhdndat"
 version = "2.0.0"
 description = "www.romhacking.net update checker"
 authors = ["i30817 <i30817@gmail.com>"]
-license = "GNU Ge
+license = "GNU General Public License v3.0"
 
 [tool.poetry.dependencies]
 python = "^3.8"
