@@ -5,7 +5,6 @@ import subprocess
 import urllib
 import shutil
 import tempfile
-import psutil
 from urllib.parse import urlparse
 from pathlib import Path
 from hashlib import sha1
@@ -117,18 +116,18 @@ def producer_windows(arguments, generator_function):
         applying the generator function to that file. Make sure the command
         output is setup for the last argument to be a output file in the arguments
     '''
-    with tempfile.SpooledTemporaryFile( max_size=psutil.virtual_memory().available-6.4e+7 ) as tmpf:
-        arguments.append(tmpf)
+    #you can't even use a spooledtemporary file as a argument to a subprocess so it has to be a real
+    #file. Moreover, windows is even worse and requires a tmpdir instead of a tmp file to open it twice
+    
+    with tempfile.TemporaryDirectory() as d:
+        patched = Path(d,'rhdndat.tmp')
+        arguments.append(patched)
         subprocess.run(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         #if a error occurred avoid writing bogus checksums
         if process.returncode != 0:
             raise NonFatalError('error during patching')
 
-        tmpf.seek(0)
-        next(generator_function)
-        for byt in iter(lambda:f.read(DEFAULT_BUFFER_SIZE), b''):
-            generator_function.send(byt)
-        return generator_function.send([])
+        return file_producer(patched, generator_function)
 
 def read(x):
     return x['user.rhdndat.rom_sha1'].decode('ascii')
@@ -218,7 +217,7 @@ def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     if should_store:
                         sha1_checksum = producer_unix([xdelta, '-d', '-s',  rom, patch],  generator)
                         store(x, sha1_checksum)
-                    else:
+                   python -m pip install --upgrade --force-reinstall else:
                         sha1_checksum = read(x)
                 else:
                     if should_store:
