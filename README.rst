@@ -84,7 +84,7 @@ rhdndat requires python 3.8 or later.
 <https://github.com/i30817/rhdndat>`_.
 
 
-The project can be installed on recent linux machines with pip3 by installing latest master from [github]_ but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn. That depends on your distribution but you can get and build them on the sites at the end of the document.
+The project can be installed on recent linux machines with pip3 by installing latest master from [github]_ but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn. In windows, you'll also want to check the option to “Add Python to PATH” when installing python, to be able to execute the script from any path of the cmd line.
 
 
 .. [github] ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip``
