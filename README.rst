@@ -75,6 +75,8 @@ Options:
                         customize the installation.
   --help                Show this message and exit.
 
+.. [1] `scroll down and click 'prepare' to get a collection of .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
+
 Install
 -------
 
@@ -84,14 +86,14 @@ rhdndat requires python 3.8 or later.
 <https://github.com/i30817/rhdndat>`_.
 
 
-The project can be installed on recent linux machines with pip3 by installing latest master from [github]_ but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
+The project can be installed with pip3 but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
+
++--------+------------------------------------------------------------------------------+
+| github | ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip`` |
++--------+------------------------------------------------------------------------------+
 
 
-.. [github] ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip``
-
-.. [1] `scroll down and click 'prepare' to get a collection of .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
-
-rhdndat may fail to execute if your OS doesn't add the pip3 install dir ``~/.local/bin`` - in linux - to the path.  In windows, you'll want to check the option to “Add Python to PATH” when installing python, to be able to execute the script from any path of the cmd line.
+ rhdndat may fail to execute if your OS doesn't add the pip3 install dir ``~/.local/bin`` to the path.  In windows, you'll want to check the option to “Add Python to PATH” when installing python.
 
 Credits
 ---------
