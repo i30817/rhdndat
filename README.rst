@@ -36,9 +36,6 @@ To rename files if you have the dat files and xdelta3 (to check for rxdelta orig
 
 Requires xdelta3 on path or the same directory.
 
-Arguments:
-----------
-
 Usage: **rhdndat** [OPTIONS] **ROMDIR**
 
 Arguments:
@@ -55,8 +52,7 @@ Usage: **rhdndat-rn** [OPTIONS] **ROMDIR** **DATDIR**
 
 Arguments:
   ROMDIR  Directory to search for roms to rename.  [required]
-  DATDIR  Directory to search for xml dat files to use as source of new names.
-          [required]
+  DATDIR  Directory to search for xml dat files to use as source of new names.  [required]
 
 Options:
   --force               This option forces a recalculation and store of
