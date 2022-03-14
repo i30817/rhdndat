@@ -52,6 +52,7 @@ Usage: **rhdndat-rn** [OPTIONS] **ROMDIR** **DATDIR**
 
 Arguments:
   ROMDIR  Directory to search for roms to rename.  [required]
+  
   DATDIR  Directory to search for xml dat files to use as source of new names.  [required]
 
 Options:
