@@ -40,7 +40,7 @@ class VersionFileSyntaxError(Exception):
         self.versionfile = versionfile
 
 class RHDNTRomRemovedError(Exception):
-    def __init__(self, url):
+    def __init__(self, versionfile, url):
         super().__init__()
         self.versionfile = versionfile
         self.url = url
@@ -447,7 +447,7 @@ def get_romhacking_data(possible_metadata):
                 raise VersionFileURLError(possible_metadata, url)
 
             if remote_version != version:
-                warn(f'warn: local '{version}' != upstream '{remote_version}' versions')
+                warn(f'warn: local \'{version}\' != upstream \'{remote_version}\' versions')
                 warn(f' patch: {url}')
                 warn(f' path:  {possible_metadata.parent.as_uri()}')
         except (urllib.error.URLError, AttributeError) as e:
