@@ -1,104 +1,98 @@
-rhdndat: romhacking.net_ dat creator and update checker
-=======================================================
+rhdndat: romhacking.net_ and update checker
+===========================================
 
 .. _romhacking.net: http://www.romhacking.net
 
 
-**rhdndat** finds triples ``(rom file, softpatch file, version file)`` on the same directory, uses ``version`` to check for romhacking.net updates, and creates a clrmamepro entry on stdout or file for the result of each softpatch.
+**rhdndat** finds ``rhdndat.ver`` files to check for romhacking.net updates
 
-| A softpatch filename is:
-| ``rom filename - rom extension + patch extension`` or
-| ``rom filename - rom extension + .reset.xdelta``
+A version file is named ``rhdndat.ver`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
-This last is a special case to recognize hardpatched roms with revert patches.
+**rhdndat-rn** renames files and patches to new .DAT [1]_ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute ``user.rhdndat.rom_sha1`` to speed up renaming in subsequent executions (in unix, not windows).
 
-version file is simply named ``version`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation.
+To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched game to get the original. In the convention these are named '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support chd).
 
-If there is no patch file, but a version file exists, the extension matches, and ``-d`` is used and does not recognize the rom, the file will be assumed to be hardpatched, which can be avoided by passing ``-i``.
+rhdndat-rn will read every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, _no_ curved brackets, it preselects the option to 'skip', because those are hack conventions and thus the name is probably intentional.
 
-During normal operation, for all roms rhdndat stores extended attributes ``user.rom.md5``, ``user.rom.crc32`` and ``user.rom.sha1`` in the rom file, and these checksums refer to the 'patched' file, even if the patch is a softpatch.
+Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
 
-This makes rhdndat faster by only checksumming again after version file modification or after using the ``-x`` option.
+To check for updates if you have the version files:
 
-The intended workflow is:
+``rhdnet romdir``
+                        check if there are any updates
 
-``rhdnet dir romtype -t``
-                        check if there are any updates, then update the patches and version files here
+To rename files if you have the dat files and xdelta3 (to check for rxdelta original checksum):
 
-then one of two options:
+``rhdnet-rn [--force] [--ext...] romdir datdir``
+                        the list of rom extensions should be a list of all bare file types used on your dats, the default list is:
+                        ``a78 hdi fdi ngc ws wsc pce bin gb gba gbc n64 v64 z64 3ds nds nes lnx fds sfc nsp 32x gg sms md iso dim exe bat adf ipf``
+                        
+                        as a warning, some of these extensions are very common, so if you don't restrict the 'romdir' to places where the only
+                        (for instance) bin is a cd track, you might get useless checks a lot. Calling more than once with restricted romdir and
+                        less extensions is always a option if you want to avoid this. Accidental renames are unlikely, because the program will
+                        only ask to rename checksum matches, you need confirmation and because the checksum is unlikely to have collisions.
+                        
+                        Certain extensions are also hardcoded remove a header when calculating ``user.rhdndat.rom_sha1`` to match the dat checksum.
 
-``rhdnet dir romtype -s``
-                        if you want to update the extended attributes of changed version files dirs only
-
-``rhdnet dir romtype -o hackdat -d nointroxml``
-                        if you want to create or update a retroarch hack dat and take the original names
-                        from a nointro xml (used for translations only)
-
-Requires flips (if trying to work with ips, bps) and xdelta3 (if trying to work with xdelta) on path or the same directory, unless on a Windows OS.
-
-On windows, rhdndat only checks versions, has no optional arguments and flips/xdelta are not required.
+Requires xdelta3 on path or the same directory.
 
 Arguments:
 ----------
 
-**rhdndat** [-h] [-o **output-file**] [-d **xml-file**] [-i] [-x] [-s] [-t] **search-path** **rom-type**
+Usage: **rhdndat** [OPTIONS] **ROMDIR**
 
-positional arguments:
-  -search-path     directory tree to search for (rom, patches and version) files
+Arguments:
+  ROMDIR  Directory to search for versions to check.  [required]
 
-  -rom-type        extension (without dot) of roms to find patches for
+Options:
+  --install-completion  Install completion for the current shell.
+  --show-completion     Show completion for the current shell, to copy it or
+                        customize the installation.
+  --help                Show this message and exit.
 
-optional arguments:
-  -h, --help      show this help message and exit
-  -o output-file  if omitted writes to stdout, if not empty merge entries,
-                  to override a entry, a new entry must list the same
-                  romhacking urls as the older entry
 
-  -d xml-file     normally the name is from the romhacking.net hack page,
-                  but this option picks up the game names from from this
-                  clrmamepro .xml and the rom checksum (including if a
-                  revert patch is available)
+Usage: **rhdndat-rn** [OPTIONS] **ROMDIR** **DATDIR**
 
-                  this allows adding unknown roms without a patch, which
-                  can't normally be added for safety, albeit with the
-                  romhacking name (the dat blacklists the known files,
-                  such as music tracks in cd games)
+Arguments:
+  ROMDIR  Directory to search for roms to rename.  [required]
+  DATDIR  Directory to search for xml dat files to use as source of new names.
+          [required]
 
-                  it's your responsibility to use a dat that matches the
-                  game/set you're scanning to avoid known files
-
-  -i              don't allow roms with unknown original name to be added even
-                  if the patches have a romhacking.net hack page, requires -d
-
-  -x              recalculate the extended attributes of all rom files even if
-                  the version file is unchanged, useful for silent updates, the
-                  easy way to redo the checksums of files without version files
-
-  -s              do not progress beyond setting the extended attributes,
-                  exclusive option, except for -x
-
-  -t              only test version numbers against remote version,
-                  works without a patch present, exclusive option
-
-Memory Requirements
--------------------
-
-This tool uses named FIFO files to calculate checksums when it has to patch, so not much memory is consumed. However, for patches of large roms like isos, you should make sure you're using xdelta instead of bps, because flips tries to read the whole file into memory to create or apply a patch.
+Options:
+  --force               This option forces a recalculation and store of
+                        checksum (in unix, on windows the calculation always
+                        happens).
+  --ext TEXT            Lowercase ROM extensions to find names of. This option
+                        can be passed more than once (once per extension).
+                        Note that you can ommit this argument to get the
+                        predefined list, and also note that 'cue' is not a
+                        valid ROM. You should always strive to use the part of
+                        the rom that has a unique identifier, for cds with
+                        multiple tracks track 1, but since we can't select
+                        only track 1, 'bin'.  [default: a78, hdi, fdi, ngc,
+                        ws, wsc, pce, bin, gb, gba, gbc, n64, v64, z64, 3ds,
+                        nds, nes, lnx, fds, sfc, nsp, 32x, gg, sms, md, iso,
+                        dim, exe, bat, adf, ipf]
+  --install-completion  Install completion for the current shell.
+  --show-completion     Show completion for the current shell, to copy it or
+                        customize the installation.
+  --help                Show this message and exit.
 
 Install
 -------
 
-rhdndat requires python 3.5 or later.
+rhdndat requires python 3.8 or later.
 
 `The source for this project is available here
 <https://github.com/i30817/rhdndat>`_.
 
 
-The project can be installed on recent linux machines with pip3 by installing rhdndat from [PyPI]_ or installing latest master from [github]_ but you'll have to provide your own flips and xdelta executables in path (or current dir) for the ips, bps and xdelta support. That depends on your distribution but you can get and build them on the sites at the end of the document.
+The project can be installed on recent linux machines with pip3 by installing latest master from [github]_ but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn. That depends on your distribution but you can get and build them on the sites at the end of the document.
 
 
-.. [PyPI] ``pip3 install --user rhdndat``
 .. [github] ``pip3 install --user https://github.com/i30817/rhdndat/archive/master.zip``
+
+.. [1] `scroll down and click 'prepare' to get a collection of .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
 
 rhdndat may fail to execute if your OS doesn't add the pip3 install dir ``~/.local/bin`` - in linux - to the path
 
