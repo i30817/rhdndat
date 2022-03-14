@@ -12,7 +12,6 @@ pick = "^1.2.0"
 colorama = "^0.4.4"
 beautifulsoup4 = "^4.10.0"
 lxml = "^4.8.0"
-windows-curses = {version = "^2.3.0", markers = "sys_platform == 'win32'"}
 xattr = {version = "^0.9.9", markers = "sys_platform == 'linux2'"}
 
 
