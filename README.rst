@@ -101,13 +101,13 @@ Credits
 
 .. class:: tablacreditos
 
-+------------------------------------------------+------------------------------------------------+
-| Alcaro for helpful comments and for flips      | https://github.com/Alcaro/Flips                |
-+------------------------------------------------+------------------------------------------------+
-| windows xdelta, remember to rename to xdelta3  | https://github.com/jmacd/xdelta-gpl/releases   |
-+------------------------------------------------+------------------------------------------------+
-| romhacking.net for being a awesome resource    | http://www.romhacking.net/                     |
-+------------------------------------------------+------------------------------------------------+
++-----------------------------------------------+------------------------------------------------+
+| Alcaro for helpful comments and for flips     | https://github.com/Alcaro/Flips                |
++-----------------------------------------------+------------------------------------------------+
+| xdelta, remember to rename to xdelta3         | https://github.com/jmacd/xdelta-gpl/releases   |
++-----------------------------------------------+------------------------------------------------+
+| romhacking.net for being awesome              | http://www.romhacking.net/                     |
++-----------------------------------------------+------------------------------------------------+
 
 `The source for this project is available here
 <https://github.com/i30817/rhdndat>`_.
