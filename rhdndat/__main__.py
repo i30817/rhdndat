@@ -155,17 +155,33 @@ def dictsetsum(dict1, dict2):
 #this method might rename files.
 #since we use dats to get the possible new filenames from the 'rom name' entry
 #it shouldn't be possible to end up with illegal characters on windows though, unless i'm missing something.
-def mainaux(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
+def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             datdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for xml dat files to use as source of new names.'),
             force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
             ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'bin', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'exe', 'bat', 'adf', 'ipf'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list, and also note that \'cue\' is not a valid ROM. You should always strive to use the part of the rom that has a unique identifier, for cds with multiple tracks track 1, but since we can\'t select only track 1, \'bin\'.')
             ):
     """
-    romhacking.net update checker
+    rom renamer
     
-    rhdndat finds rhdndat.ver files to check for romhacking.net updates
+    rhdndat-rn renames files and patches to new .DAT¹ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute user.rhdndat.rom_sha1 to speed up renaming in subsequent executions (in unix, not windows).
 
-    A version file is named rhdndat.ver and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
+    To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched game to get the original. In the convention these are named '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support chd).
+
+    rhdndat-rn will read every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions and thus the name is probably intentional.
+
+    Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
+    
+    Certain extensions are also hardcoded remove a header when calculating user.rhdndat.rom_sha1 to match the dat checksum.
+
+    Requires xdelta3² on path or the same directory.
+    
+    ¹ scroll down and click 'prepare' to get a collection of .DAT files.
+    
+    https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily
+    
+    ² in windows download xdelta3 from here and rename it 'xdelta3.exe' before placing on the same path as rhdndat-rn before using it.
+    
+    https://github.com/jmacd/xdelta-gpl/releases
 
     To update this program with pip installed, type:
     
@@ -470,29 +486,13 @@ def get_romhacking_data(possible_metadata):
     return (metadata, language)
 
 
-def mainaux2(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.')):
+def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.')):
     """
-    rom renamer
+    romhacking.net update checker
     
-    rhdndat-rn renames files and patches to new .DAT¹ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute user.rhdndat.rom_sha1 to speed up renaming in subsequent executions (in unix, not windows).
+    rhdndat finds rhdndat.ver files to check for romhacking.net updates
 
-    To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched game to get the original. In the convention these are named '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support chd).
-
-    rhdndat-rn will read every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions and thus the name is probably intentional.
-
-    Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
-    
-    Certain extensions are also hardcoded remove a header when calculating user.rhdndat.rom_sha1 to match the dat checksum.
-
-    Requires xdelta3² on path or the same directory.
-    
-    ¹ scroll down and click 'prepare' to get a collection of .DAT files.
-    
-    https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily
-    
-    ² in windows download xdelta3 from here and rename it 'xdelta3.exe' before placing on the same path as rhdndat-rn before using it.
-    
-    https://github.com/jmacd/xdelta-gpl/releases
+    A version file is named rhdndat.ver and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
     To update this program with pip installed, type:
     
@@ -523,11 +523,11 @@ def mainaux2(romdir: Path = typer.Argument(..., exists=True, file_okay=False, di
         raise typer.Abort()
 
 def rename():
-    typer.run(mainaux)
+    typer.run(renamer)
     return 0
             
 def main():
-    typer.run(mainaux2)
+    typer.run(versioncheck)
     return 0
 
 if __name__ == "__main__":
