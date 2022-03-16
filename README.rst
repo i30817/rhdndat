@@ -25,7 +25,7 @@ To rename files if you have the dat files and xdelta3 (to check for rxdelta orig
 
 ``rhdnet-rn [--force] [--ext...] romdir datdir``
                         the list of rom extensions should be a list of all bare file types used on your dats, the default list is:
-                        ``a78 hdi fdi ngc ws wsc pce bin gb gba gbc n64 v64 z64 3ds nds nes lnx fds sfc nsp 32x gg sms md iso dim exe bat adf ipf``
+                        ``a78 hdi fdi ngc ws wsc pce bin gb gba gbc n64 v64 z64 3ds nds nes lnx fds sfc nsp 32x gg sms md iso dim exe bat adf ipf dsi``
                         
                         as a warning, some of these extensions are very common, so if you don't restrict the 'romdir' to places where the only
                         (for instance) bin is a cd track, you might get useless checks a lot. Calling more than once with restricted romdir and
