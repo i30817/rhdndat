@@ -82,17 +82,17 @@ Install
 
 rhdndat requires python 3.8 or later.
 
-rhdndat may fail to execute if your OS doesn't add the pip3 install dir ``~/.local/bin`` to the path.
+rhdndat may fail to execute if your OS doesn't add the pip install dir ``~/.local/bin`` to the path.
 
 In windows, you'll want to check the option to “Add Python to PATH” when installing python. 
 
-The project can be installed with pip3 but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
+The project can be installed with pip but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
 
 In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install ``Scripts`` directory if you installed with the path option selected is enough.
 
 
 +---------------------+--------------------------------------------------------------------------------------------------+
-| Linux               | ``pip3 install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip``          |
+| Linux               | ``pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip``          |
 +---------------------+--------------------------------------------------------------------------------------------------+
 | Windows             | ``python -m pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
 +---------------------+--------------------------------------------------------------------------------------------------+
