@@ -96,10 +96,6 @@ In linux just installing xdelta3 from the repositories is enough, in windows, pl
 +---------------------+--------------------------------------------------------------------------------------------------+
 | Windows             | ``python -m pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
 +---------------------+--------------------------------------------------------------------------------------------------+
-| Run in Windows      | ``python PYTHON_INSTALL_DIR\Scripts\rhdndat or python PYTHON_INSTALL_DIR\Scripts\rhdndat-rn``    |
-+---------------------+--------------------------------------------------------------------------------------------------+
-
-
 
 Credits
 ---------
