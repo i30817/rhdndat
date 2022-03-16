@@ -88,7 +88,7 @@ In windows, you'll want to check the option to “Add Python to PATH” when ins
 
 The project can be installed with pip3 but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
 
-In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install `Scripts`` directory if you installed with the path option selected is enough.
+In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install ``Scripts`` directory if you installed with the path option selected is enough.
 
 
 +---------------------+--------------------------------------------------------------------------------------------------+
