@@ -1,5 +1,5 @@
-rhdndat: romhacking.net_ and update checker
-===========================================
+romhacking.net_ update checker and rom renamer
+==============================================
 
 .. _romhacking.net: http://www.romhacking.net
 
