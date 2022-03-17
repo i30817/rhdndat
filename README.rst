@@ -32,7 +32,7 @@ To rename files if you have the dat files and xdelta3 (to check for rxdelta orig
                         less extensions is always a option if you want to avoid this. Accidental renames are unlikely, because the program will
                         only ask to rename checksum matches, you need confirmation and because the checksum is unlikely to have collisions.
                         
-                        Certain extensions are also hardcoded remove a header when calculating ``user.rhdndat.rom_sha1`` to match the dat checksum.
+                        Certain extensions are also hardcoded to remove a header when calculating ``user.rhdndat.rom_sha1`` to match the dat checksum.
 
 Requires xdelta3 on path or the same directory.
 

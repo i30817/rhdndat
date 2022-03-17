@@ -171,7 +171,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
     
-    Certain extensions are also hardcoded remove a header when calculating user.rhdndat.rom_sha1 to match the dat checksum.
+    Certain extensions are also hardcoded to remove a header when calculating user.rhdndat.rom_sha1 to match the dat checksum.
 
     Requires xdelta3² on path or the same directory.
     
