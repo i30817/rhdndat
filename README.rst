@@ -18,12 +18,12 @@ Besides rom files, files affected by renames are cues/tracks (treated especially
 
 To check for updates if you have the version files:
 
-``rhdnet romdir``
+``rhdndat romdir``
                         check if there are any updates
 
 To rename files if you have the dat files and xdelta3 (to check for rxdelta original checksum):
 
-``rhdnet-rn [--force] [--ext...] romdir datdir``
+``rhdndat-rn [--force] [--ext...] romdir datdir``
                         the list of rom extensions should be a list of all bare file types used on your dats, the default list is:
                         ``a78 hdi fdi ngc ws wsc pce bin gb gba gbc n64 v64 z64 3ds nds nes lnx fds sfc nsp 32x gg sms md iso dim adf ipf dsi``
                         
