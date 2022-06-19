@@ -8,7 +8,7 @@ romhacking.net_ update checker and rom renamer
 
 A version file is named ``rhdndat.ver`` and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
-**rhdndat-rn** renames files and patches to new .DAT [1]_ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute ``user.rhdndat.rom_sha1`` to speed up renaming in subsequent executions (in unix, not windows).
+**rhdndat-rn** renames files and patches to new .DAT [1]_ [2]_ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute ``user.rhdndat.rom_sha1`` to speed up renaming in subsequent executions (in unix, not windows).
 
 To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched game to get the original. In the convention these have the extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support chd).
 
@@ -64,22 +64,21 @@ Options:
   --force               This option forces a recalculation and store of
                         checksum (in unix, on windows the calculation always
                         happens).
-  --ext TEXT            Lowercase ROM extensions to find names of.
-                        This option can be passed more than once
-                        (once per extension). Note that you can
-                        ommit this argument to get the predefined
-                        list. Needs dolphin-tool (from the dolphin
-                        emulator) in the $PATH to check rvz files.
-                        [default: a78, hdi, fdi, ngc, ws, wsc, pce,
-                        gb, gba, gbc, n64, v64, z64, 3ds, nds, nes,
-                        lnx, fds, sfc, nsp, 32x, gg, sms, md, iso,
-                        dim, adf, ipf, dsi, cue, gdi, rvz]
+  --ext TEXT            Lowercase ROM extensions to find names of. This option
+                        can be passed more than once (once per extension).
+                        Note that you can ommit this argument to get the
+                        predefined list. Needs dolphin-tool (from the dolphin
+                        emulator) in the $PATH to check rvz files.  [default:
+                        a78, hdi, fdi, ngc, ws, wsc, pce, gb, gba, gbc, n64,
+                        v64, z64, 3ds, nds, nes, lnx, fds, sfc, nsp, 32x, gg,
+                        sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi, rvz]
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
   --help                Show this message and exit.
 
-.. [1] `scroll down and click 'prepare' to get a collection of .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
+.. [1] `scroll down and click 'prepare' to get a collection of cartidge rom .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
+.. [2] `download cd/dvd roms .DAT files here <http://redump.org/downloads/>`_.
 
 Install
 -------
@@ -106,17 +105,18 @@ Credits
 
 .. class:: tablacreditos
 
-+-----------------------------------------------+------------------------------------------------+
-| Alcaro for helpful comments and for flips     | https://github.com/Alcaro/Flips                |
-+-----------------------------------------------+------------------------------------------------+
-| xdelta, remember to rename to xdelta3         | https://github.com/jmacd/xdelta-gpl/releases   |
-+-----------------------------------------------+------------------------------------------------+
-| romhacking.net for being awesome              | http://www.romhacking.net/                     |
-+-----------------------------------------------+------------------------------------------------+
-| turn ips header patches to no-header patches  | https://github.com/heuripedes/ipsbehead        |
-+-----------------------------------------------+------------------------------------------------+
-| dolphin-tool, linux requires build            | https://dolphin-emu.org/download/              |
-+-----------------------------------------------+------------------------------------------------+
++-------------------------------------------------------+----------------------------------------------+
+| Alcaro for helpful comments and for flips             | https://github.com/Alcaro/Flips              |
++-------------------------------------------------------+----------------------------------------------+
+| romhacking.net for being awesome                      | http://www.romhacking.net/                   |
++-------------------------------------------------------+----------------------------------------------+
+| Turn ips header patches to no-header patches          | https://github.com/heuripedes/ipsbehead      |
++-------------------------------------------------------+----------------------------------------------+
+| Remember to rename to xdelta3 and place in path       | https://github.com/jmacd/xdelta-gpl/releases |
++-------------------------------------------------------+----------------------------------------------+
+| Remember to rename to dolphin-tool and place in path, | https://dolphin-emu.org/download/            |
+| linux requires build                                  |                                              |
++-------------------------------------------------------+----------------------------------------------+
 
 `The source for this project is available here
 <https://github.com/i30817/rhdndat>`_.

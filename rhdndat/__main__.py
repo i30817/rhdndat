@@ -159,12 +159,12 @@ def dictsetsum(dict1, dict2):
 def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             datdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for xml dat files to use as source of new names.'),
             force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
-            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list. Needs dolphin-tool (from the dolphin emulator) in the $PATH to check rvz files.')
+            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list. Needs dolphin-tool (from the dolphin emulator) in the $PATH to check rvz files.')
             ):
     """
     rom renamer
     
-    rhdndat-rn renames files and patches to new .DAT¹ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute user.rhdndat.rom_sha1 to speed up renaming in subsequent executions (in unix, not windows).
+    rhdndat-rn renames files and patches to new .DAT¹² rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute user.rhdndat.rom_sha1 to speed up renaming in subsequent executions (in unix, not windows).
 
     To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched game to get the original. In the convention these have the extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support chd).
 
@@ -177,21 +177,25 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another
     header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the
     current no-intro rom to the older patched rom. This is especially a problem for nes dumps, which don't work without the header.
-    For sfc and pce ips hacks that target a headered rom I recommend ipsbehead² to change the patch to target the no-header rom.
+    For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
 
-    Requires xdelta3³ (to process rxdelta) and dolphin-tool⁴ (to operate on rvz files) on path or the same directory.
+    Requires xdelta3⁴ (to process rxdelta) and dolphin-tool⁵ (to operate on rvz files) on path or the same directory.
     
-    ¹ scroll down and click 'prepare' to get a collection of .DAT files.
+    ¹ scroll down and click 'prepare' to get a collection of cartrige rom .DAT files
     
     https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily
     
-    ² https://github.com/heuripedes/ipsbehead
+    ² download cd/dvd roms .DAT files here
     
-    ³ in windows download xdelta3 from here and rename it 'xdelta3.exe' and place in the path, in linux install xdelta3.
+    http://redump.org/downloads/
+    
+    ³ https://github.com/heuripedes/ipsbehead
+    
+    ⁴ in windows download xdelta3 from here and rename it 'xdelta3.exe' and place in the path, in linux install xdelta3.
     
     https://github.com/jmacd/xdelta-gpl/releases
     
-    ⁴ dolphin-tool is part of the dolphin emulator. In windows rename it 'dolphin-tool.exe', in linux you have to build it from source, then place it in the path.
+    ⁵ dolphin-tool is part of the dolphin emulator. In windows rename it 'dolphin-tool.exe', in linux you have to build it from source, then place it in the path.
     
     To update this program with pip installed, type:
     
