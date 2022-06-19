@@ -172,18 +172,27 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
     
-    Certain extensions are also hardcoded to remove a header when calculating user.rhdndat.rom_sha1 to match the dat checksum.
+    Certain extensions are also hardcoded to remove a header when calculating 'user.rhdndat.rom_sha1' to match the dat checksum.
+    There is no alternative since no-intro dumps with headers use this pattern, where the checksum is not the file checksums.
+    This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another
+    header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the
+    current no-intro rom to the older patched rom. This is especially a problem for nes dumps, which don't work without the header.
+    For sfc and pce ips hacks that target a headered rom I recommend ipsbehead² to change the patch to target the no-header rom.
 
-    Requires xdelta3² on path or the same directory.
+    Requires xdelta3³ (to process rxdelta) and dolphin-tool⁴ (to operate on rvz files) on path or the same directory.
     
     ¹ scroll down and click 'prepare' to get a collection of .DAT files.
     
     https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily
     
-    ² in windows download xdelta3 from here and rename it 'xdelta3.exe' before placing on the same path as rhdndat-rn before using it.
+    ² https://github.com/heuripedes/ipsbehead
+    
+    ³ in windows download xdelta3 from here and rename it 'xdelta3.exe' and place in the path, in linux install xdelta3.
     
     https://github.com/jmacd/xdelta-gpl/releases
-
+    
+    ⁴ dolphin-tool is part of the dolphin emulator. In windows rename it 'dolphin-tool.exe', in linux you have to build it from source, then place it in the path.
+    
     To update this program with pip installed, type:
     
     pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
@@ -191,11 +200,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     try:
         xdelta = which('xdelta3')
     except EXENotFoundError as e:
-        error(f'error: rhdndat-rn needs xdelta3 on its location, the current dir, or the OS path')
-        raise typer.Abort()
+        warn(f'warn: rhdndat-rn needs xdelta3 on its location, the current dir, or the OS path to use rxdelta files to rename hardpatched roms')
+        pass
     try:
         dolphin = which('dolphin-tool')
     except EXENotFoundError as e:
+        warn(f'warn: rhdndat-rn needs dolphin-tool on its location, the current dir, or the OS path to rename rvz roms')
         pass
     
     xmls = datdir.glob('**/*.dat')
@@ -253,29 +263,30 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             games = None
             for rfile in files:
                 checksum = None
-                
                 if rfile.suffix.lower() == '.rvz':
-                    if dolphin:
-                        if os.name == 'nt':
+                    if os.name == 'nt':
+                        if dolphin:
                             process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
                             process.check_returncode()
                             checksum = process.stdout.strip()
-                        else:
-                            x = xattr.xattr(rfile)
-                            should_store = force or needs_store(x)
-                            if should_store:
+                    else:
+                        x = xattr.xattr(rfile)
+                        should_store = force or needs_store(x)
+                        if should_store:
+                            if dolphin:
                                 process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
                                 process.check_returncode()
                                 checksum = process.stdout.strip()
                                 store(x, checksum)
-                            else:
-                                checksum = read(x)
+                        else:
+                            checksum = read(x)
                 else:
                     patch = rfile.with_suffix('.rxdelta')
                     #can't use xattr and the pipe version of xdelta subprocess
                     if os.name == 'nt':
                         if patch.is_file():
-                           checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
+                            if xdelta:
+                                checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
                         else:
                            checksum = file_producer(rfile, generator)
                     #can use xattr and the pipe version of the xdelta subprocess
@@ -284,8 +295,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         should_store = force or needs_store(x)
                         if patch.is_file():
                             if should_store:
-                                checksum = producer_unix([xdelta, '-d', '-s',  rfile, patch],  generator)
-                                store(x, checksum)
+                                if xdelta:
+                                   checksum = producer_unix([xdelta, '-d', '-s',  rfile, patch],  generator)
+                                   store(x, checksum)
                             else:
                                 checksum = read(x)
                         else:
@@ -295,7 +307,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                             else:
                                 checksum = read(x)
                 #find the games where all 'roms' checked are represented
-                if checksum not in combined_dict:
+                if not checksum or checksum not in combined_dict:
                     errors = 1
                     break
                 if not games:

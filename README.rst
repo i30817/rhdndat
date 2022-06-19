@@ -33,8 +33,13 @@ To rename files if you have the dat files and xdelta3 (to check for rxdelta orig
                         only ask to rename checksum matches, you need confirmation and because the checksum is unlikely to have collisions.
                         
                         Certain extensions are also hardcoded to remove a header when calculating ``user.rhdndat.rom_sha1`` to match the dat checksum.
+                        There is no alternative since no-intro dumps with headers use this pattern, where the checksum is not the file checksums.
+                        This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another
+                        header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the
+                        current no-intro rom to the older patched rom. This is especially a problem for nes dumps, which don't work without the header.
+                        For sfc and pce ips hacks that target a headered rom I recommend ipsbehead to change the patch to target the no-header rom.
 
-Requires xdelta3 on path or the same directory.
+Requires xdelta3 (to process rxdelta) and dolphin-tool (to operate on rvz files) on path or the same directory.
 
 Usage: **rhdndat** [OPTIONS] **ROMDIR**
 
@@ -107,6 +112,10 @@ Credits
 | xdelta, remember to rename to xdelta3         | https://github.com/jmacd/xdelta-gpl/releases   |
 +-----------------------------------------------+------------------------------------------------+
 | romhacking.net for being awesome              | http://www.romhacking.net/                     |
++-----------------------------------------------+------------------------------------------------+
+| turn ips header patches to no-header patches  | https://github.com/heuripedes/ipsbehead        |
++-----------------------------------------------+------------------------------------------------+
+| dolphin-tool, linux requires build            | https://dolphin-emu.org/download/              |
 +-----------------------------------------------+------------------------------------------------+
 
 `The source for this project is available here
