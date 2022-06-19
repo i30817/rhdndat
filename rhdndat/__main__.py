@@ -13,6 +13,7 @@ import re
 import signal
 import typer
 from io import DEFAULT_BUFFER_SIZE
+from itertools import chain
 from typing import Optional, List
 from bs4 import BeautifulSoup
 from pick import pick
@@ -158,7 +159,7 @@ def dictsetsum(dict1, dict2):
 def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             datdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for xml dat files to use as source of new names.'),
             force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
-            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'bin', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list, and also note that \'cue\' is not a valid ROM. You should always strive to use the part of the rom that has a unique identifier, for cds with multiple tracks track 1, but since we can\'t select only track 1, \'bin\'.')
+            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list. Needs dolphin-tool (from the dolphin emulator) in the $PATH to check rvz files.')
             ):
     """
     rom renamer
@@ -187,12 +188,15 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     
     pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
     """
-            
     try:
         xdelta = which('xdelta3')
     except EXENotFoundError as e:
-        error(f'error: rhdndat needs xdelta3 on its location, the current dir, or the OS path')
+        error(f'error: rhdndat-rn needs xdelta3 on its location, the current dir, or the OS path')
         raise typer.Abort()
+    try:
+        dolphin = which('dolphin-tool')
+    except EXENotFoundError as e:
+        pass
     
     xmls = datdir.glob('**/*.dat')
         
@@ -200,7 +204,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         typer.echo(f'Given dat directory has no dats.')
         raise typer.Abort()
     
-    dicts = map( lambda x: getdict(BeautifulSoup(open(x), 'lxml').find_all('game'), x) ,  xmls)
+    dicts = map( lambda x: getdict(BeautifulSoup(open(x), features="xml").find_all('game'), x) ,  xmls)
     combined_dict = reduce(dictsetsum, dicts, dict())
     ext = list(map( lambda s: s if s.startswith('.') else '.' + s, ext))
     default_headers = {  '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128  }
@@ -218,95 +222,126 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 skip = 0
             generator = get_sha1(skip)
             
-            #cds are handled especially to not have to bother confirming changing dozens of tracks
-            chosen_cue = None
-            chosen_txt = None
-            for cue in rom.parent.glob('./*.cue'):
-                with open(cue) as fcue:
-                    txt = fcue.read()
-                    if rom.name in txt: 
-                        chosen_cue = cue
-                        chosen_txt = txt
-                        break            
-            if chosen_cue:
-                files = re.findall('FILE\s+"(.*)"\s+BINARY', chosen_txt)
-                #instead of using a random and possibly audio track (which migth be shared by several games)
-                #make sure we're using track 1 to id games, which always (?) has executables, game headers or both
-                rom = rom.with_name(files[0])
+            #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
+            #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
+            files = [ rom ] #default to share code between the cue version and single file
+            index_file = None
+            index_txt = None
+            if rom.suffix.lower() == '.cue' or rom.suffix.lower() == '.gdi':
+                with open(rom, 'r') as fcue:
+                    index_txt = fcue.read()
+                index_file = rom
+                #instead of considering just the 'rom' file, consider also all file tracks inside cue or gdi
+                files = list(map( lambda x: Path(x), re.findall('"(.*)"', index_txt)))
             
-            patch = rom.with_suffix('.rxdelta')
-            #can't use xattr and the pipe version of xdelta subprocess
-            if os.name == 'nt':
-                if patch.is_file():
-                   sha1_checksum = producer_windows([xdelta, '-d', '-s',  rom, patch],  generator)
-                else:
-                   sha1_checksum = file_producer(rom, generator)
-            #can use xattr and the pipe version of the xdelta subprocess
-            else:
-                x = xattr.xattr(rom)
-                should_store = force or needs_store(x)
-                if patch.is_file():
-                    if should_store:
-                        sha1_checksum = producer_unix([xdelta, '-d', '-s',  rom, patch],  generator)
-                        store(x, sha1_checksum)
-                    else:
-                        sha1_checksum = read(x)
-                else:
-                    if should_store:
-                        sha1_checksum = file_producer(rom, generator)
-                        store(x, sha1_checksum)
-                    else:
-                        sha1_checksum = read(x)
-            
-            if sha1_checksum not in combined_dict:
-                warn(f'UNDATTED {rom.name}')
+            #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
+            errors = 0
+            for f in files:
+                proto_rom = proto.with_name(f.name)
+                renamed.add(proto_rom)
+                if not f.is_file():
+                    error(f'error: {index_file.name} missing track {f}')
+                    errors += 1
+            if errors > 0:
+                error(f'error: please fix the cue track(s)')
                 continue
             
-            if chosen_cue:
-                #remove the cue elements from the running if checked once
-                for f in files:
-                    proto_rom = proto.with_name(f)
-                    renamed.add(proto_rom)
-                    if not proto_rom.is_file():
-                        error(f'ERROR: cue {chosen_cue} missing track {f}')
-
-            games = combined_dict[sha1_checksum]
+            #restore from cache or calculate and store in cache the sha1sum(s). In the case of cues/gdi, check all
+            #if the file has a corresponding .rxdelta, use that as a prior patch before calculating the checksum.
+            #rvz, since they're container formats should not have rxdelta
+            #only output the 'games' that have all files checksums.
+            games = None
+            for rfile in files:
+                checksum = None
+                
+                if rfile.suffix.lower() == '.rvz':
+                    if dolphin:
+                        if os.name == 'nt':
+                            process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
+                            process.check_returncode()
+                            checksum = process.stdout.strip()
+                        else:
+                            x = xattr.xattr(rfile)
+                            should_store = force or needs_store(x)
+                            if should_store:
+                                process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
+                                process.check_returncode()
+                                checksum = process.stdout.strip()
+                                store(x, checksum)
+                            else:
+                                checksum = read(x)
+                else:
+                    patch = rfile.with_suffix('.rxdelta')
+                    #can't use xattr and the pipe version of xdelta subprocess
+                    if os.name == 'nt':
+                        if patch.is_file():
+                           checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
+                        else:
+                           checksum = file_producer(rfile, generator)
+                    #can use xattr and the pipe version of the xdelta subprocess
+                    else:
+                        x = xattr.xattr(rfile)
+                        should_store = force or needs_store(x)
+                        if patch.is_file():
+                            if should_store:
+                                checksum = producer_unix([xdelta, '-d', '-s',  rfile, patch],  generator)
+                                store(x, checksum)
+                            else:
+                                checksum = read(x)
+                        else:
+                            if should_store:
+                                checksum = file_producer(rfile, generator)
+                                store(x, checksum)
+                            else:
+                                checksum = read(x)
+                #find the games where all 'roms' checked are represented
+                if checksum not in combined_dict:
+                    errors = 1
+                    break
+                if not games:
+                    games = set(combined_dict[checksum])
+                else:
+                    games = games.intersection(combined_dict[checksum])
+            if not games or errors > 0:
+                warn(f'undatted/incomplete {rom.name}')
+                continue
+            #turn back to list to use with the pick api
+            games = list(games)
+            
             #ignore keyboard signal to not fuck up the renames of cues if using it 
             #(waits until it's out of the critical section, if you keep pressed)
             s = signal.signal(signal.SIGINT, signal.SIG_IGN)
             
-            if chosen_cue:
-                possibilities = ['no'] + list( map( lambda x: x.find('rom', sha1=sha1_checksum ).get('name'), games ) )
-                
-                default_i = len(possibilities) - 1
-                if rom.name in possibilities:
-                    default_i = possibilities.index(rom.name)
-                    if len(possibilities) == 2:
-                        continue
-                if '(' not in rom.name: #likely hack! default to 'no'
-                    default_i = 0
-                
-                choice, index = pick(possibilities,  f'RENAME {rom.name} ?', default_index=default_i)
-                
-                if choice != 'no':
-                    game = games[index-1]
-                    roms = list(game.find_all('rom'))
-                    newcue = next(filter(lambda x : x.get('name').endswith('.cue'), roms))
-                    roms.remove(newcue)
-
+            possibilities = ['no'] + list( map( lambda x: x.get('name'), games ) )
+            
+            default_i = len(possibilities) - 1
+            if rom.stem in possibilities:
+                default_i = possibilities.index(rom.stem)
+                if len(possibilities) == 2:
+                    continue
+            if '(' not in rom.name: #likely hack! default to 'no'
+                default_i = 0
+            
+            choice, index = pick(possibilities,  f'rename {rom.stem} ?', default_index=default_i)
+            if choice != 'no':
+                game = games[index-1]
+                roms = game.find_all('rom') #ordered by insertion order, just like the cue file parser above
+                if index_file:
+                    newcue = roms.pop(0) #first is the cue/gdi
+            
                     confirm = len(files) == len(roms)
                     
-                    if not confirm:  
-                        typer.echo(Fore.RED + f'ERROR: {chosen_cue.name} has a different number of tracks than the chosen game {choice}, skipping.' + Fore.RESET)
+                    if not confirm:
+                        typer.echo(Fore.RED + f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.' + Fore.RESET)
                         continue
                     
                     for f, r in zip(files, roms):
-                        abs_oldrom = proto.with_name(f)
+                        abs_oldrom = proto.with_name(f.name)
                         abs_newrom = proto.with_name(r.get('name'))
                         abs_oldrom.rename(abs_newrom)
                         typer.echo(Fore.GREEN + f'{abs_oldrom.name} -> {abs_newrom.name}' + Fore.RESET)
                         
-                        chosen_txt = chosen_txt.replace(abs_oldrom.name, abs_newrom.name)
+                        index_txt = index_txt.replace(abs_oldrom.name, abs_newrom.name)
                         
                         #patch sibling file types that need to change name if the file changes name
                         abs_oldpatch = proto.with_name(abs_oldrom.stem+'.rxdelta')
@@ -316,30 +351,16 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                             log(f'{abs_oldpatch.name} -> {abs_newpatch.name}')
                     
                     abs_newcue = proto.with_name(newcue.get('name'))
-                    chosen_cue.rename(abs_newcue)
-                    abs_newcue.write_text(chosen_txt, encoding='utf-8')
-            else:
-                possibilities = ['no'] + list( map( lambda x: x.find('rom', sha1=sha1_checksum ).get('name'), games ) )
-                
-                default_i = len(possibilities) - 1
-                if rom.name in possibilities:
-                    default_i = possibilities.index(rom.name)
-                    if len(possibilities) == 2:
-                        continue
-                if '(' not in rom.name: #likely hack! default to 'no'
-                    default_i = 0
-                
-                choice, index = pick(possibilities,  f'RENAME {rom.name} ?', default_index=default_i)
-                    
-                if choice != 'no':
-                    game = games[index-1]
-                    roms = list(game.find_all('rom'))
-                    if len(roms) != 1:
-                        error(f'{rom} unexpectadly has more than one file, skipping.')
-                        continue
+                    index_file.rename(abs_newcue)
+                    abs_newcue.write_text(index_txt, encoding='utf-8')
+                else:
                     newrom = roms[0]
                     
                     abs_newrom = proto.with_name(newrom.get('name'))
+                    #some containers are supported, like rvz (and maybe in the future, chd)
+                    if rom.suffix.lower() == '.rvz' and '.rvz' != abs_newrom.suffix:
+                        abs_newrom = abs_newrom.with_suffix(rom.suffix)
+                    
                     rom.rename(abs_newrom)
                     typer.echo(Fore.GREEN + f'{rom.name} -> {abs_newrom.name}' + Fore.RESET)
                     
@@ -367,7 +388,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         abs_newrom = abs_newrom.with_suffix('.rxdelta')
                         reset4.rename(abs_newrom)
                         log(f'{reset4.name} -> {abs_newrom.name}')
-
+            
                     #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
                     #until the number does not match (or 99 i guess)
                     for x in range(1, 100):

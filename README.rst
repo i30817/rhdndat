@@ -59,17 +59,16 @@ Options:
   --force               This option forces a recalculation and store of
                         checksum (in unix, on windows the calculation always
                         happens).
-  --ext TEXT            Lowercase ROM extensions to find names of. This option
-                        can be passed more than once (once per extension).
-                        Note that you can ommit this argument to get the
-                        predefined list, and also note that 'cue' is not a
-                        valid ROM. You should always strive to use the part of
-                        the rom that has a unique identifier, for cds with
-                        multiple tracks track 1, but since we can't select
-                        only track 1, 'bin'.  [default: a78, hdi, fdi, ngc,
-                        ws, wsc, pce, bin, gb, gba, gbc, n64, v64, z64, 3ds,
-                        nds, nes, lnx, fds, sfc, nsp, 32x, gg, sms, md, iso,
-                        dim, adf, ipf]
+  --ext TEXT            Lowercase ROM extensions to find names of.
+                        This option can be passed more than once
+                        (once per extension). Note that you can
+                        ommit this argument to get the predefined
+                        list. Needs dolphin-tool (from the dolphin
+                        emulator) in the $PATH to check rvz files.
+                        [default: a78, hdi, fdi, ngc, ws, wsc, pce,
+                        gb, gba, gbc, n64, v64, z64, 3ds, nds, nes,
+                        lnx, fds, sfc, nsp, 32x, gg, sms, md, iso,
+                        dim, adf, ipf, dsi, cue, gdi, rvz]
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
