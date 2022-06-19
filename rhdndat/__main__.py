@@ -232,13 +232,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     index_txt = fcue.read()
                 index_file = rom
                 #instead of considering just the 'rom' file, consider also all file tracks inside cue or gdi
-                files = list(map( lambda x: Path(x), re.findall('"(.*)"', index_txt)))
+                files = list(map( lambda x: Path(proto.parent,x), re.findall('"(.*)"', index_txt)))
             
             #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
             errors = 0
             for f in files:
-                proto_rom = proto.with_name(f.name)
-                renamed.add(proto_rom)
+                renamed.add(f)
                 if not f.is_file():
                     error(f'error: {index_file.name} missing track {f}')
                     errors += 1
@@ -336,7 +335,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         continue
                     
                     for f, r in zip(files, roms):
-                        abs_oldrom = proto.with_name(f.name)
+                        abs_oldrom = f
                         abs_newrom = proto.with_name(r.get('name'))
                         abs_oldrom.rename(abs_newrom)
                         typer.echo(Fore.GREEN + f'{abs_oldrom.name} -> {abs_newrom.name}' + Fore.RESET)
