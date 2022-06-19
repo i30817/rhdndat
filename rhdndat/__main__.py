@@ -210,6 +210,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     default_headers = {  '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128  }
     renamed = set()
     for rom in (p.resolve() for p in romdir.glob('**/*') if p.suffix.lower() in ext):
+        previous_signal = None
         try:
             proto = rom
             if rom in renamed: #might have been already renamed from cue processing
@@ -309,7 +310,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             #ignore keyboard signal to not fuck up the renames of cues if using it 
             #(waits until it's out of the critical section, if you keep pressed)
-            s = signal.signal(signal.SIGINT, signal.SIG_IGN)
+            previous_signal = signal.signal(signal.SIGINT, signal.SIG_IGN)
             
             possibilities = ['no'] + list( map( lambda x: x.get('name'), games ) )
             
@@ -408,11 +409,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                             log(f'{next3.name} -> {abs_newrom.name}')
                         else:
                             break
-                    
-            #reneable keyboard kills
-            signal.signal(signal.SIGINT, s)
         except KeyError as e:
             continue #not a rom
+        finally:
+            #reneable keyboard kills
+            if previous_signal:
+                signal.signal(signal.SIGINT, previous_signal)
 
 def is_rhdn_translation(url_str):
     return 'www.romhacking.net/translations' in url_str
