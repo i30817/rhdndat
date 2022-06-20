@@ -67,11 +67,10 @@ Options:
   --ext TEXT            Lowercase ROM extensions to find names of. This option
                         can be passed more than once (once per extension).
                         Note that you can ommit this argument to get the
-                        predefined list. Needs dolphin-tool (from the dolphin
-                        emulator) in the $PATH to check rvz files.  [default:
-                        a78, hdi, fdi, ngc, ws, wsc, pce, gb, gba, gbc, n64,
-                        v64, z64, 3ds, nds, nes, lnx, fds, sfc, nsp, 32x, gg,
-                        sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi, rvz]
+                        predefined list.  [default: a78, hdi, fdi, ngc, ws,
+                        wsc, pce, gb, gba, gbc, n64, v64, z64, 3ds, nds, nes,
+                        lnx, fds, sfc, nsp, 32x, gg, sms, md, iso, dim, adf,
+                        ipf, dsi, wad, cue, gdi, rvz]
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
@@ -85,13 +84,15 @@ Install
 
 rhdndat requires python 3.8 or later.
 
-rhdndat may fail to execute if your OS doesn't add the pip install dir ``~/.local/bin`` to the path.
+rhdndat may fail to execute in linux if the dir ``~/.local/bin`` to is not in the ``$PATH``.
 
 In windows, you'll want to check the option to “Add Python to PATH” when installing python. 
 
-The project can be installed with pip but you'll have to provide your own xdelta executable in path (or current dir) for rhdndat-rn.
+The project can be installed with pip but you'll have to provide your own xdelta3 and dolphin-tool executables in the path (or current dir) for supporting rvz and rxdelta.
 
 In linux just installing xdelta3 from the repositories is enough, in windows, placing a executable for xdelta3 named ``xdelta3.exe`` in the python install ``Scripts`` directory if you installed with the path option selected is enough.
+
+In linux you'll have to build dolphin-tool (it's not built by dolphin-emu packages) and place it in ``~/.local/bin``, and in windows you can copy it from the dolphin install directory, rename it to ``dolphin-tool.exe`` and place it in the python install ``Scripts`` directory.
 
 
 +---------------------+--------------------------------------------------------------------------------------------------+
@@ -100,8 +101,8 @@ In linux just installing xdelta3 from the repositories is enough, in windows, pl
 | Windows             | ``python -m pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
 +---------------------+--------------------------------------------------------------------------------------------------+
 
-Credits
----------
+Links
+-----
 
 .. class:: tablacreditos
 
