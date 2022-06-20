@@ -355,7 +355,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         newrom = oldrom.with_name(r_json.get('name'))
                         oldrom.rename(newrom)
                         typer.echo(Fore.GREEN + f'{oldrom.name} -> {newrom.name}' + Fore.RESET)
-                        
+                        #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
                         index_txt = index_txt.replace(oldrom.name, newrom.name)
                         
                         #patch sibling file types that need to change name if the file changes name
