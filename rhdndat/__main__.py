@@ -20,14 +20,14 @@ from pick import pick
 from colorama import Fore, init
 init()
 
-def nc_warn(string, end='\n'):
-    print(string, file=sys.stderr, end=end)
 def warn(string, end='\n'):
     print(Fore.YELLOW + string + Fore.RESET, file=sys.stderr, end=end)
 def error(string, end='\n'):
     print(Fore.RED + string + Fore.RESET, file=sys.stderr, end=end)
 def log(string, end='\n'):
     print(Fore.BLUE + string + Fore.RESET, file=sys.stderr, end=end)
+def ok(string, end='\n'):
+    print(Fore.GREEN + string + Fore.RESET, file=sys.stderr, end=end)
 
 class EXENotFoundError(Exception):
     def __init__(self, executable):
@@ -215,7 +215,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     xmls = datdir.glob('**/*.dat')
         
     if not xmls:
-        typer.echo(f'Given dat directory has no dats.')
+        error(f'Given dat directory has no dats.')
         raise typer.Abort()
     
     dicts = map( lambda x: getdict(BeautifulSoup(open(x), features="xml").find_all('game'), x) ,  xmls)
@@ -348,13 +348,13 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     confirm = len(files) == len(roms_json)
                     
                     if not confirm:
-                        typer.echo(Fore.RED + f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.' + Fore.RESET)
+                        error(f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.')
                         continue
                     
                     for oldrom, r_json in zip(files, roms_json):
                         newrom = oldrom.with_name(r_json.get('name'))
                         oldrom.rename(newrom)
-                        typer.echo(Fore.GREEN + f'{oldrom.name} -> {newrom.name}' + Fore.RESET)
+                        ok(f'{oldrom.name} -> {newrom.name}')
                         #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
                         index_txt = index_txt.replace(oldrom.name, newrom.name)
                         
@@ -368,7 +368,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     newcue = index_file.with_name(newcue.get('name'))
                     index_file.rename(newcue)
                     newcue.write_text(index_txt, encoding='utf-8')
-                    log(f'{index_file.name} -> {newcue.name}')
+                    ok(f'{index_file.name} -> {newcue.name}')
                 else:
                     newrom = rom.with_name(roms_json[0].get('name'))
                     #some containers are supported, like rvz (and maybe in the future, chd)
@@ -376,7 +376,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         newrom = newrom.with_suffix(rom.suffix)
                     
                     rom.rename(newrom)
-                    typer.echo(Fore.GREEN + f'{rom.name} -> {newrom.name}' + Fore.RESET)
+                    ok(f'{rom.name} -> {newrom.name}')
                     
                     reset1  = rom.with_suffix('.ips')
                     reset2  = rom.with_suffix('.bps')
