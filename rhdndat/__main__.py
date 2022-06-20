@@ -226,7 +226,6 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     for rom in (p.resolve() for p in romdir.glob('**/*') if p.suffix.lower() in ext):
         previous_signal = None
         try:
-            proto = rom
             if rom in renamed: #might have been already renamed from cue processing
                 continue
             
@@ -247,15 +246,16 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     index_txt = fcue.read()
                 index_file = rom
                 #instead of considering just the 'rom' file, consider also all file tracks inside cue or gdi
-                files = list(map( lambda x: Path(proto.parent,x), re.findall('"(.*)"', index_txt)))
+                files = list(map( lambda x: Path(x) if Path(x).is_absolute() else Path(rom.parent,x), re.findall('"(.*)"', index_txt)))
             
             #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
             errors = 0
             for f in files:
-                renamed.add(f)
                 if not f.is_file():
                     error(f'error: {index_file.name} missing track {f}')
                     errors += 1
+                    continue
+                renamed.add(f)
             if errors > 0:
                 error(f'error: please fix the cue track(s)')
                 continue
@@ -341,88 +341,82 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             choice, index = pick(possibilities,  f'rename {rom.stem} ?', default_index=default_i)
             if choice != 'no':
                 game = games[index-1]
-                roms = game.find_all('rom') #ordered by insertion order, just like the cue file parser above
+                roms_json = game.find_all('rom') #ordered by insertion order, just like the cue file parser above
                 if index_file:
-                    newcue = roms.pop(0) #first is the cue/gdi
+                    newcue = roms_json.pop(0) #first is the cue/gdi
             
-                    confirm = len(files) == len(roms)
+                    confirm = len(files) == len(roms_json)
                     
                     if not confirm:
                         typer.echo(Fore.RED + f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.' + Fore.RESET)
                         continue
                     
-                    for f, r in zip(files, roms):
-                        abs_oldrom = f
-                        abs_newrom = proto.with_name(r.get('name'))
-                        abs_oldrom.rename(abs_newrom)
-                        typer.echo(Fore.GREEN + f'{abs_oldrom.name} -> {abs_newrom.name}' + Fore.RESET)
+                    for oldrom, r_json in zip(files, roms_json):
+                        newrom = oldrom.with_name(r_json.get('name'))
+                        oldrom.rename(newrom)
+                        typer.echo(Fore.GREEN + f'{oldrom.name} -> {newrom.name}' + Fore.RESET)
                         
-                        index_txt = index_txt.replace(abs_oldrom.name, abs_newrom.name)
+                        index_txt = index_txt.replace(oldrom.name, newrom.name)
                         
                         #patch sibling file types that need to change name if the file changes name
-                        abs_oldpatch = proto.with_name(abs_oldrom.stem+'.rxdelta')
-                        if abs_oldpatch.exists():
-                            abs_newpatch = proto.with_name(abs_newrom.stem+'.rxdelta')
-                            abs_oldpatch.rename(abs_newpatch)
-                            log(f'{abs_oldpatch.name} -> {abs_newpatch.name}')
+                        oldpatch = oldrom.with_name(oldrom.stem+'.rxdelta')
+                        if oldpatch.exists():
+                            newpatch = oldrom.with_name(newrom.stem+'.rxdelta')
+                            oldpatch.rename(newpatch)
+                            log(f'{oldpatch.name} -> {newpatch.name}')
                     
-                    abs_newcue = proto.with_name(newcue.get('name'))
-                    index_file.rename(abs_newcue)
-                    abs_newcue.write_text(index_txt, encoding='utf-8')
+                    newcue = index_file.with_name(newcue.get('name'))
+                    index_file.rename(newcue)
+                    newcue.write_text(index_txt, encoding='utf-8')
+                    log(f'{index_file.name} -> {newcue.name}')
                 else:
-                    newrom = roms[0]
-                    
-                    abs_newrom = proto.with_name(newrom.get('name'))
+                    newrom = rom.with_name(roms_json[0].get('name'))
                     #some containers are supported, like rvz (and maybe in the future, chd)
-                    if rom.suffix.lower() == '.rvz' and '.rvz' != abs_newrom.suffix:
-                        abs_newrom = abs_newrom.with_suffix(rom.suffix)
+                    if rom.suffix.lower() == '.rvz' and '.rvz' != newrom.suffix:
+                        newrom = newrom.with_suffix(rom.suffix)
                     
-                    rom.rename(abs_newrom)
-                    typer.echo(Fore.GREEN + f'{rom.name} -> {abs_newrom.name}' + Fore.RESET)
+                    rom.rename(newrom)
+                    typer.echo(Fore.GREEN + f'{rom.name} -> {newrom.name}' + Fore.RESET)
                     
                     reset1  = rom.with_suffix('.ips')
                     reset2  = rom.with_suffix('.bps')
                     reset3  = rom.with_suffix('.ups')
                     reset4  = rom.with_suffix('.rxdelta')
-                    found = False
                     if reset1.exists():
-                        found = True
-                        abs_newrom = abs_newrom.with_suffix('.ips')
-                        reset1.rename(abs_newrom)
-                        log(f'{reset1.name} -> {abs_newrom.name}')
+                        newrom = newrom.with_suffix('.ips')
+                        reset1.rename(newrom)
+                        log(f'{reset1.name} -> {newrom.name}')
                     elif reset2.exists():
-                        found = True
-                        abs_newrom = abs_newrom.with_suffix('.bps')
-                        reset2.rename(abs_newrom)
-                        log(f'{reset2.name} -> {abs_newrom.name}')
+                        newrom = newrom.with_suffix('.bps')
+                        reset2.rename(newrom)
+                        log(f'{reset2.name} -> {newrom.name}')
                     elif reset3.exists():
-                        found = True
-                        abs_newrom = abs_newrom.with_suffix('.ups')
-                        reset3.rename(abs_newrom)
-                        log(f'{reset3.name} -> {abs_newrom.name}')
+                        newrom = newrom.with_suffix('.ups')
+                        reset3.rename(newrom)
+                        log(f'{reset3.name} -> {newrom.name}')
                     elif reset4.exists():
-                        abs_newrom = abs_newrom.with_suffix('.rxdelta')
-                        reset4.rename(abs_newrom)
-                        log(f'{reset4.name} -> {abs_newrom.name}')
+                        newrom = newrom.with_suffix('.rxdelta')
+                        reset4.rename(newrom)
+                        log(f'{reset4.name} -> {newrom.name}')
             
                     #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
-                    #until the number does not match (or 99 i guess)
+                    #until the number does not match. It's a user error for patches of different type and same number to exist.
                     for x in range(1, 100):
                         next1 = reset1.with_suffix('.ips{x}')
                         next2 = reset1.with_suffix('.bps{x}')
                         next3 = reset1.with_suffix('.ups{x}')
                         if next1.exists():
-                            abs_newrom = abs_newrom.with_suffix('.ips{x}')
-                            next1.rename(abs_newrom)
-                            log(f'{next1.name} -> {abs_newrom.name}')
+                            newrom = newrom.with_suffix('.ips{x}')
+                            next1.rename(newrom)
+                            log(f'{next1.name} -> {newrom.name}')
                         elif next2.exists():
-                            abs_newrom = abs_newrom.with_suffix('.bps{x}')
-                            next2.rename(abs_newrom)
-                            log(f'{next2.name} -> {abs_newrom.name}')
+                            newrom = newrom.with_suffix('.bps{x}')
+                            next2.rename(newrom)
+                            log(f'{next2.name} -> {newrom.name}')
                         elif next3.exists():
-                            abs_newrom = abs_newrom.with_suffix('.ups{x}')
-                            next3.rename(abs_newrom)
-                            log(f'{next3.name} -> {abs_newrom.name}')
+                            newrom = newrom.with_suffix('.ups{x}')
+                            next3.rename(newrom)
+                            log(f'{next3.name} -> {newrom.name}')
                         else:
                             break
         except KeyError as e:
