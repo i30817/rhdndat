@@ -16,30 +16,19 @@ rhdndat-rn will read every dat file from a directory given, and ask for renaming
 
 Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
 
+``nes fds lnx a78`` roms require headers and are hardcoded to ignore headers when calculating ``user.rhdndat.rom_sha1`` to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead to change the patch to target the no-header rom.
+
+Requires xdelta3 (to process rxdelta) and dolphin-tool (to operate on rvz files) on path or the same directory.
+
 To check for updates if you have the version files:
 
 ``rhdndat romdir``
                         check if there are any updates
 
-To rename files if you have the dat files and xdelta3 (to check for rxdelta original checksum):
+To rename files if you have the dat files:
 
-``rhdndat-rn [--force] [--ext...] romdir datdir``
-                        the list of rom extensions should be a list of all bare file types used on your dats, the default list is:
-                        ``a78 hdi fdi ngc ws wsc pce bin gb gba gbc n64 v64 z64 3ds nds nes lnx fds sfc nsp 32x gg sms md iso dim adf ipf dsi``
-                        
-                        as a warning, some of these extensions are very common, so if you don't restrict the 'romdir' to places where the only
-                        (for instance) bin is a cd track, you might get useless checks a lot. Calling more than once with restricted romdir and
-                        less extensions is always a option if you want to avoid this. Accidental renames are unlikely, because the program will
-                        only ask to rename checksum matches, you need confirmation and because the checksum is unlikely to have collisions.
-                        
-                        Certain extensions are also hardcoded to remove a header when calculating ``user.rhdndat.rom_sha1`` to match the dat checksum.
-                        There is no alternative since no-intro dumps with headers use this pattern, where the checksum is not the file checksums.
-                        This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another
-                        header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the
-                        current no-intro rom to the older patched rom. This is especially a problem for nes dumps, which don't work without the header.
-                        For sfc and pce ips hacks that target a headered rom I recommend ipsbehead to change the patch to target the no-header rom.
-
-Requires xdelta3 (to process rxdelta) and dolphin-tool (to operate on rvz files) on path or the same directory.
+``rhdndat-rn [--force] [--ext a78 --ext nes ...] romdir datdir``
+                        the rom extensions should be all file extensions on the files you want to rename (see below for default)
 
 Usage: **rhdndat** [OPTIONS] **ROMDIR**
 
@@ -111,7 +100,8 @@ Links
 +-------------------------------------------------------+----------------------------------------------+
 | romhacking.net for being awesome                      | http://www.romhacking.net/                   |
 +-------------------------------------------------------+----------------------------------------------+
-| Turn ips header patches to no-header patches          | https://github.com/heuripedes/ipsbehead      |
+| Turn sfc and pce ips header patches to no-header      | https://github.com/heuripedes/ipsbehead      |
+| patches                                               |                                              |
 +-------------------------------------------------------+----------------------------------------------+
 | Remember to rename to xdelta3 and place in path       | https://github.com/jmacd/xdelta-gpl/releases |
 +-------------------------------------------------------+----------------------------------------------+

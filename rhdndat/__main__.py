@@ -172,12 +172,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
     
-    Certain extensions are also hardcoded to remove a header when calculating 'user.rhdndat.rom_sha1' to match the dat checksum.
-    There is no alternative since no-intro dumps with headers use this pattern, where the checksum is not the file checksums.
-    This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another
-    header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the
-    current no-intro rom to the older patched rom. This is especially a problem for nes dumps, which don't work without the header.
-    For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
+    'nes fds lnx a78' roms require headers and are hardcoded to ignore headers when calculating 'user.rhdndat.rom_sha1' to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
 
     Requires xdelta3⁴ (to process rxdelta) and dolphin-tool⁵ (to operate on rvz files) on path or the same directory.
     
