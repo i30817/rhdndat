@@ -551,11 +551,10 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
 
 def rename():
     typer.run(renamer)
-    return 0
-            
+
 def main():
     typer.run(versioncheck)
-    return 0
 
 if __name__ == "__main__":
-    typer.run(mainaux)
+    error('Please run rhdndat or rhdndat-rn instead of running the script directly')
+    raise typer.Abort()
