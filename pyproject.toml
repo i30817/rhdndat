@@ -4,23 +4,29 @@ version = "2.3.0"
 description = "www.romhacking.net update checker"
 authors = ["i30817 <i30817@gmail.com>"]
 license = "GNU General Public License v3.0"
+readme = "README.rst"
+repository = "https://github.com/i30817/rhdndat"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-typer = "^0.5.0"
-pick = "^1.2.0"
-colorama = "^0.4.4"
 beautifulsoup4 = "^4.10.0"
+questionary = "^1.10.0"
+typer = "^0.5.0"
+colorama = "^0.4.4"
 lxml = "^4.9.1"
-xattr = {version = "^0.9.9", markers = "sys_platform == 'linux2'"}
-
-
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
+xattr = "^0.9.9"
 
 [tool.poetry.scripts]
 rhdndat = 'rhdndat.__main__:main'
 rhdndat-rn = 'rhdndat.__main__:rename'
+
+[tool.poetry.urls]
+"homepage" = 'https://github.com/i30817/rhdndat'
+"documentation" = 'https://github.com/i30817/rhdndat#readme'
+"Bug Tracker" = 'https://github.com/i30817/rhdndat/issues'
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

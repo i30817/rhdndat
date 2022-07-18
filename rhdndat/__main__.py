@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import io
 import sys
 import os
@@ -16,7 +18,8 @@ from io import DEFAULT_BUFFER_SIZE
 from itertools import chain
 from typing import Optional, List
 from bs4 import BeautifulSoup
-from pick import pick
+import questionary
+from questionary import Style
 from colorama import Fore, init
 init()
 
@@ -55,13 +58,6 @@ class VersionFileURLError(Exception):
         super().__init__()
         self.versionfile = versionfile
         self.url = url
-
-try:
-    import xattr
-except Exception as e:
-    #windows will not be able to
-    #but hopefully only windows
-    pass
 
 def which(executable):
     flips = shutil.which(executable)
@@ -197,6 +193,13 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
     """
     try:
+        import xattr
+    except Exception as e:
+        print(e)
+        #windows will not be able to
+        #but hopefully only windows
+        pass
+    try:
         xdelta = which('xdelta3')
     except EXENotFoundError as e:
         warn(f'warn: rhdndat-rn needs xdelta3 on its location, the current dir, or the OS path to use rxdelta files to rename hardpatched roms')
@@ -316,7 +319,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             if not games or errors > 0:
                 warn(f'undatted/incomplete {rom.name}')
                 continue
-            #turn back to list to use with the pick api
+            #turn back to list to use with the questionary api
             games = list(games)
             
             #ignore keyboard signal to not fuck up the renames of cues if using it 
@@ -325,15 +328,19 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             possibilities = ['no'] + list( map( lambda x: x.get('name'), games ) )
             
-            default_i = len(possibilities) - 1
+            default_i = possibilities[-1]
             if rom.stem in possibilities:
-                default_i = possibilities.index(rom.stem)
+                default_i = rom.stem
                 if len(possibilities) == 2:
                     continue
             if '(' not in rom.name: #likely hack! default to 'no'
-                default_i = 0
-            
-            choice, index = pick(possibilities,  f'rename {rom.stem} ?', default_index=default_i)
+                default_i = 'no'
+
+            custom_style = Style([
+                ('answer', 'fg:green bold'),
+            ])
+            choice = questionary.select(f'rename {rom.stem} ?', possibilities, style=custom_style, qmark='', default=default_i).ask()
+            index = possibilities.index(choice)
             if choice != 'no':
                 game = games[index-1]
                 roms_json = game.find_all('rom') #ordered by insertion order, just like the cue file parser above

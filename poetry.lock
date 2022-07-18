@@ -1,6 +1,6 @@
 [[package]]
 name = "atomicwrites"
-version = "1.4.0"
+version = "1.4.1"
 description = "Atomic file writes."
 category = "dev"
 optional = false
@@ -99,17 +99,6 @@ python-versions = ">=3.6"
 pyparsing = ">=2.0.2,<3.0.5 || >3.0.5"
 
 [[package]]
-name = "pick"
-version = "1.2.0"
-description = "Pick an option in the terminal with a simple GUI"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-windows-curses = {version = ">=2.2.0,<3.0.0", markers = "sys_platform == \"win32\""}
-
-[[package]]
 name = "pluggy"
 version = "0.13.1"
 description = "plugin and hook calling mechanisms for python"
@@ -119,6 +108,17 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
 dev = ["pre-commit", "tox"]
+
+[[package]]
+name = "prompt-toolkit"
+version = "3.0.30"
+description = "Library for building powerful interactive command lines in Python"
+category = "main"
+optional = false
+python-versions = ">=3.6.2"
+
+[package.dependencies]
+wcwidth = "*"
 
 [[package]]
 name = "py"
@@ -170,6 +170,20 @@ checkqa-mypy = ["mypy (==v0.761)"]
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
+name = "questionary"
+version = "1.10.0"
+description = "Python library to build pretty command line user prompts ⭐️"
+category = "main"
+optional = false
+python-versions = ">=3.6,<4.0"
+
+[package.dependencies]
+prompt_toolkit = ">=2.0,<4.0"
+
+[package.extras]
+docs = ["Sphinx (>=3.3,<4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "sphinx-autobuild (>=2020.9.1,<2021.0.0)", "sphinx-copybutton (>=0.3.1,<0.4.0)", "sphinx-autodoc-typehints (>=1.11.1,<2.0.0)"]
+
+[[package]]
 name = "soupsieve"
 version = "2.3.2.post1"
 description = "A modern CSS selector implementation for Beautiful Soup."
@@ -198,14 +212,6 @@ test = ["shellingham (>=1.3.0,<2.0.0)", "pytest (>=4.4.0,<5.4.0)", "pytest-cov (
 name = "wcwidth"
 version = "0.2.5"
 description = "Measures the displayed width of unicode strings in a terminal"
-category = "dev"
-optional = false
-python-versions = "*"
-
-[[package]]
-name = "windows-curses"
-version = "2.3.0"
-description = "Support for the standard curses module on Windows"
 category = "main"
 optional = false
 python-versions = "*"
@@ -224,13 +230,10 @@ cffi = ">=1.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f3634cb8fa3c96b9fd426f92331fec1d46d3f989f08fa564d3b8051af0a86a66"
+content-hash = "00922f36eeeb616331fd2ca3dab5585ba256b29e697b2063b900145f8f230cf7"
 
 [metadata.files]
-atomicwrites = [
-    {file = "atomicwrites-1.4.0-py2.py3-none-any.whl", hash = "sha256:6d1784dea7c0c8d4a5172b6c620f40b6e4cbfdf96d783691f2e1302a7b88e197"},
-    {file = "atomicwrites-1.4.0.tar.gz", hash = "sha256:ae70396ad1a434f9c7046fd2dd196fc04b12f9e91ffb859164193be8b6168a7a"},
-]
+atomicwrites = []
 attrs = [
     {file = "attrs-21.4.0-py2.py3-none-any.whl", hash = "sha256:2d27e3784d7a565d36ab851fe94887c5eccd6a463168875832a1be79c82828b4"},
     {file = "attrs-21.4.0.tar.gz", hash = "sha256:626ba8234211db98e869df76230a137c4c40a12d72445c45d5f5b716f076e2fd"},
@@ -393,14 +396,11 @@ packaging = [
     {file = "packaging-21.3-py3-none-any.whl", hash = "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"},
     {file = "packaging-21.3.tar.gz", hash = "sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb"},
 ]
-pick = [
-    {file = "pick-1.2.0-py3-none-any.whl", hash = "sha256:faffd2ba4c5409d22cad366b4e8892fd26ebedcd4d3fd5e98562914279208da7"},
-    {file = "pick-1.2.0.tar.gz", hash = "sha256:594f96c205d75bff889f4cee40d87fe50d2a477ff937c9cf6b3a9d4feb44e7f8"},
-]
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
     {file = "pluggy-0.13.1.tar.gz", hash = "sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0"},
 ]
+prompt-toolkit = []
 py = [
     {file = "py-1.11.0-py2.py3-none-any.whl", hash = "sha256:607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378"},
     {file = "py-1.11.0.tar.gz", hash = "sha256:51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719"},
@@ -417,6 +417,7 @@ pytest = [
     {file = "pytest-5.4.3-py3-none-any.whl", hash = "sha256:5c0db86b698e8f170ba4582a492248919255fcd4c79b1ee64ace34301fb589a1"},
     {file = "pytest-5.4.3.tar.gz", hash = "sha256:7979331bfcba207414f5e1263b5a0f8f521d0f457318836a7355531ed1a4c7d8"},
 ]
+questionary = []
 soupsieve = [
     {file = "soupsieve-2.3.2.post1-py3-none-any.whl", hash = "sha256:3b2503d3c7084a42b1ebd08116e5f81aadfaea95863628c80a3b774a11b7c759"},
     {file = "soupsieve-2.3.2.post1.tar.gz", hash = "sha256:fc53893b3da2c33de295667a0e19f078c14bf86544af307354de5fcf12a3f30d"},
@@ -428,18 +429,6 @@ typer = [
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
     {file = "wcwidth-0.2.5.tar.gz", hash = "sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83"},
-]
-windows-curses = [
-    {file = "windows_curses-2.3.0-cp310-cp310-win32.whl", hash = "sha256:a3a63a0597729e10f923724c2cf972a23ea677b400d2387dee1d668cf7116177"},
-    {file = "windows_curses-2.3.0-cp310-cp310-win_amd64.whl", hash = "sha256:7a35eda4cb120b9e1a5ae795f3bc06c55b92c9d391baba6be1903285a05f3551"},
-    {file = "windows_curses-2.3.0-cp36-cp36m-win32.whl", hash = "sha256:4d5fb991d1b90a41c2332f02241a1f84c8a1e6bc8f6e0d26f532d0da7a9f7b51"},
-    {file = "windows_curses-2.3.0-cp36-cp36m-win_amd64.whl", hash = "sha256:170c0d941c2e0cdf864e7f0441c1bdf0709232bf4aa7ce7f54d90fc76a4c0504"},
-    {file = "windows_curses-2.3.0-cp37-cp37m-win32.whl", hash = "sha256:d5cde8ec6d582aa77af791eca54f60858339fb3f391945f9cad11b1ab71062e3"},
-    {file = "windows_curses-2.3.0-cp37-cp37m-win_amd64.whl", hash = "sha256:e913dc121446d92b33fe4f5bcca26d3a34e4ad19f2af160370d57c3d1e93b4e1"},
-    {file = "windows_curses-2.3.0-cp38-cp38-win32.whl", hash = "sha256:fbc2131cec57e422c6660e6cdb3420aff5be5169b8e45bb7c471f884b0590a2b"},
-    {file = "windows_curses-2.3.0-cp38-cp38-win_amd64.whl", hash = "sha256:cc5fa913780d60f4a40824d374a4f8ca45b4e205546e83a2d85147315a57457e"},
-    {file = "windows_curses-2.3.0-cp39-cp39-win32.whl", hash = "sha256:935be95cfdb9213f6f5d3d5bcd489960e3a8fbc9b574e7b2e8a3a3cc46efff49"},
-    {file = "windows_curses-2.3.0-cp39-cp39-win_amd64.whl", hash = "sha256:c860f596d28377e47f322b7382be4d3573fd76d1292234996bb7f72e0bc0ed0d"},
 ]
 xattr = [
     {file = "xattr-0.9.9-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:58a9fb4fd19b467e88f4b75b5243706caa57e312d3aee757b53b57c7fd0f4ba9"},
