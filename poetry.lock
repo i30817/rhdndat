@@ -230,7 +230,7 @@ cffi = ">=1.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "00922f36eeeb616331fd2ca3dab5585ba256b29e697b2063b900145f8f230cf7"
+content-hash = "98d1322fee424f28c555c0fce41a705b3ad0177d4a945808dad82275f7a665ea"
 
 [metadata.files]
 atomicwrites = []

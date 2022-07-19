@@ -193,6 +193,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
     """
     try:
+        xattr = None
         import xattr
     except Exception as e:
         print(e)
@@ -266,12 +267,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             for rfile in files:
                 checksum = None
                 if rfile.suffix.lower() == '.rvz':
-                    if os.name == 'nt':
-                        if dolphin:
-                            process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
-                            process.check_returncode()
-                            checksum = process.stdout.strip()
-                    else:
+                    if xattr:
                         x = xattr.xattr(rfile)
                         should_store = force or needs_store(x)
                         if should_store:
@@ -282,17 +278,14 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                                 store(x, checksum)
                         else:
                             checksum = read(x)
+                    else:
+                        if dolphin:
+                            process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
+                            process.check_returncode()
+                            checksum = process.stdout.strip()
                 else:
                     patch = rfile.with_suffix('.rxdelta')
-                    #can't use xattr and the pipe version of xdelta subprocess
-                    if os.name == 'nt':
-                        if patch.is_file():
-                            if xdelta:
-                                checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
-                        else:
-                           checksum = file_producer(rfile, generator)
-                    #can use xattr and the pipe version of the xdelta subprocess
-                    else:
+                    if xattr:
                         x = xattr.xattr(rfile)
                         should_store = force or needs_store(x)
                         if patch.is_file():
@@ -308,6 +301,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                                 store(x, checksum)
                             else:
                                 checksum = read(x)
+                    else:
+                        if patch.is_file():
+                            if xdelta:
+                                checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
+                        else:
+                           checksum = file_producer(rfile, generator)
                 #find the games where all 'roms' checked are represented
                 if not checksum or checksum not in combined_dict:
                     errors = 1
