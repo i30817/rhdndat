@@ -12,7 +12,7 @@ A version file is named ``rhdndat.ver`` and has a version number line followed b
 
 To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched file to get the original. These have the same name as the file and extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support delta chd).
 
-rhdndat-rn will read every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions so the name is probably intentional.
+rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions so the name is probably intentional.
 
 Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
 
@@ -27,10 +27,10 @@ To check for updates if you have the version files:
 
 To rename files if you have the dat files:
 
-``rhdndat-rn [--force] [--ext a78 --ext nes ...] romdir datdir``
+``rhdndat-rn [--force] [--ext a78 --ext nes ...] romdir xmldata``
                         the rom extensions should be all file extensions on the files you want to rename (see below for default)
 
-Usage: **rhdndat** [OPTIONS] **ROMDIR**
+**Usage: rhdndat [OPTIONS] ROMDIR**
 
 Arguments:
   ROMDIR  Directory to search for versions to check.  [required]
@@ -42,12 +42,13 @@ Options:
   --help                Show this message and exit.
 
 
-Usage: **rhdndat-rn** [OPTIONS] **ROMDIR** **DATDIR**
+**Usage: rhdndat-rn [OPTIONS] ROMDIR XMLDATA**
 
 Arguments:
   ROMDIR  Directory to search for roms to rename.  [required]
   
-  DATDIR  Directory to search for xml dat files to use as source of new names.  [required]
+  XMLDATA Xml dat file or directory to search for xml dat files to use as
+  source of new names.  [required]
 
 Options:
   --force               This option forces a recalculation and store of
