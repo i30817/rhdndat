@@ -10,7 +10,7 @@ A version file is named ``rhdndat.ver`` and has a version number line followed b
 
 **rhdndat-rn** renames files and patches to new .DAT [1]_ [2]_ rom names if it can find the rom checksum in those .DAT files and memorizes the checksum of the 'original rom' as a extended attribute ``user.rhdndat.rom_sha1`` to speed up renaming in subsequent executions (in unix, not windows).
 
-To find the checksum of the original file for hardpatched roms, rhdndat can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched file to get the original. These have the same name as the file and extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support delta chd).
+To find the checksum of the original file for hardpatched roms, rhdndat-rn can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched file to get the original. These have the same name as the file and extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support delta chd).
 
 rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions so the name is probably intentional.
 
@@ -27,30 +27,23 @@ To check for updates if you have the version files:
 
 To rename files if you have the dat files:
 
-``rhdndat-rn [--force] [--ext a78 --ext nes ...] romdir xmldata``
+``rhdndat-rn [--force] [--ext a78 --ext nes ...] romdir xmlpath``
                         the rom extensions should be all file extensions on the files you want to rename (see below for default)
 
-**Usage: rhdndat [OPTIONS] ROMDIR**
+rhdndat [OPTIONS] ROMDIR
+  :ROMDIR:  Directory to search for versions to check.  [required]
 
-Arguments:
-  ROMDIR  Directory to search for versions to check.  [required]
-
-Options:
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
   --help                Show this message and exit.
 
 
-**Usage: rhdndat-rn [OPTIONS] ROMDIR XMLDATA**
-
-Arguments:
-  ROMDIR  Directory to search for roms to rename.  [required]
+rhdndat-rn [OPTIONS] ROMDIR XMLPATH
+  :ROMDIR:  Directory to search for roms to rename.  [required]
   
-  XMLDATA Xml dat file or directory to search for xml dat files to use as
-  source of new names.  [required]
+  :XMLPATH: Xml dat file or directory to search for xml dat files to use as source of new names.  [required]
 
-Options:
   --force               This option forces a recalculation and store of
                         checksum (in unix, on windows the calculation always
                         happens).
