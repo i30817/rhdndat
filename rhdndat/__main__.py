@@ -235,7 +235,6 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 skip = default_headers[rom.suffix.lower()]
             except KeyError as e:
                 skip = 0
-            generator = get_sha1(skip)
             
             #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
             #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
@@ -267,6 +266,8 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #only output the 'games' that have all files checksums.
             games = None
             for rfile in files:
+                #do not reuse the generators
+                generator = get_sha1(skip)
                 checksum = None
                 if rfile.suffix.lower() == '.rvz':
                     if xattr:
