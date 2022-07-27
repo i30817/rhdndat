@@ -8,6 +8,8 @@ import urllib
 import shutil
 import tempfile
 from urllib.parse import urlparse
+from urllib.request import urlopen
+from urllib.error import URLError
 from pathlib import Path
 from hashlib import sha1
 from functools import reduce
@@ -48,7 +50,7 @@ class RHDNTRomRemovedError(Exception):
         self.versionfile = versionfile
         self.url = url
 
-class NonFatalError(Exception):
+class PatchingError(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message)
         self.errors = errors
@@ -104,7 +106,7 @@ def producer_unix(arguments, generator_function):
             generator_function.send(byt)
     #if a error occurred avoid writing bogus checksums
     if process.returncode != 0:
-        raise NonFatalError('error during patching')
+        raise PatchingError('error during patching')
 
     return generator_function.send([])
 
@@ -123,7 +125,7 @@ def producer_windows(arguments, generator_function):
             pass
         #if a error occurred avoid writing bogus checksums
         if process.returncode != 0:
-            raise NonFatalError('error during patching')
+            raise PatchingError('error during patching')
 
         return file_producer(patched, generator_function)
 
@@ -319,7 +321,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 else:
                     games = games.intersection(combined_dict[checksum])
             if not games or errors > 0:
-                warn(f'undatted/incomplete {rom.name}')
+                warn(f'undatted/incomplete: {rom.name}')
                 continue
             #turn back to list to use with the questionary api
             games = list(games)
@@ -423,6 +425,11 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                             log(f'{next3.name} -> {newrom.name}')
                         else:
                             break
+        except PatchingError as e:
+            error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
+            error(f' file: {rom.name}')
+            error(f' path: {rom.parent.as_uri()}')
+            continue
         except KeyError as e:
             continue #not a rom
         finally:
@@ -468,7 +475,7 @@ def get_romhacking_data(possible_metadata):
 
     for (version, url) in version_hacks:
         try:
-            page = urllib.request.urlopen(url).read()
+            page = urlopen(url).read()
             soup = BeautifulSoup(page, 'lxml')
 
             #removed hacks from romhacking.net can be bad news, broken or malicious hacks
@@ -517,12 +524,14 @@ def get_romhacking_data(possible_metadata):
                 warn(f'warn: local \'{version}\' != upstream \'{remote_version}\' versions')
                 warn(f' patch: {url}')
                 warn(f' path:  {possible_metadata.parent.as_uri()}')
-        except (urllib.error.URLError, AttributeError) as e:
+        except (URLError, AttributeError) as e:
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
 
 
-def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.')):
+def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.'),
+    quiet: bool = typer.Option(False, help='Don\'t show the directory of the each checked rhdndat.ver file.')
+    ):
     """
     romhacking.net update checker
     
@@ -538,11 +547,10 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
     versions = romdir.glob("**/rhdndat.ver")
     try:
         for possible_metadata in versions:
+            if not quiet:
+                log(f'check: {possible_metadata.parent}') 
             try:
-               get_romhacking_data(possible_metadata)
-            #non fatal errors
-            except NonFatalError as e:
-                warn(f'skip: {e}')
+                get_romhacking_data(possible_metadata)
             except RHDNTRomRemovedError as e:
                 warn(f'skip: romhacking.net deleted patch, check reason and delete last version from dat if bad')
                 warn(f' patch: {e.url}')
