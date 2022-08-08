@@ -47,6 +47,14 @@ python-versions = "*"
 pycparser = "*"
 
 [[package]]
+name = "chd-rs-py"
+version = "0.1.4"
+description = "Python bindings to chd-rs"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
 name = "click"
 version = "8.1.3"
 description = "Composable command line interface toolkit"
@@ -230,7 +238,7 @@ cffi = ">=1.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "98d1322fee424f28c555c0fce41a705b3ad0177d4a945808dad82275f7a665ea"
+content-hash = "f8da450dc4d6d4e247a1407cea017c7d3e80d44a94e626b8b3fbfa831ef28436"
 
 [metadata.files]
 atomicwrites = [
@@ -309,6 +317,11 @@ cffi = [
     {file = "cffi-1.15.1-cp39-cp39-win32.whl", hash = "sha256:40f4774f5a9d4f5e344f31a32b5096977b5d48560c5592e2f3d2c4374bd543ee"},
     {file = "cffi-1.15.1-cp39-cp39-win_amd64.whl", hash = "sha256:70df4e3b545a17496c9b3f41f5115e69a4f2e77e94e1d2a8e1070bc0c38c8a3c"},
     {file = "cffi-1.15.1.tar.gz", hash = "sha256:d400bfb9a37b1351253cb402671cea7e89bdecc294e8016a707f6d1d8ac934f9"},
+]
+chd-rs-py = [
+    {file = "chd_rs_py-0.1.4-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:fad006e7ed25cca55349db9df9843231ea6f9055d47a4f4730466a101d3f07d7"},
+    {file = "chd_rs_py-0.1.4-cp37-none-win_amd64.whl", hash = "sha256:160fc9533deefd76924d92e7f8a0c440f47bd2116bc815c7854805166f70076e"},
+    {file = "chd_rs_py-0.1.4.tar.gz", hash = "sha256:16a2d339f74164bfe8767fd6e241153cbfeca9f70374f0bade305c4c52f171d9"},
 ]
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},

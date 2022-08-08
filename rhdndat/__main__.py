@@ -357,6 +357,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         error(f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.')
                         continue
                     
+                    #rename tracks
                     for oldrom, r_json in zip(files, roms_json):
                         newrom = oldrom.with_name(r_json.get('name'))
                         oldrom.rename(newrom)
@@ -371,10 +372,18 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                             oldpatch.rename(newpatch)
                             log(f'{oldpatch.name} -> {newpatch.name}')
                     
+                    #rename and rewrite cue
                     newcue = index_file.with_name(newcue.get('name'))
                     index_file.rename(newcue)
                     newcue.write_text(index_txt, encoding='utf-8')
                     ok(f'{index_file.name} -> {newcue.name}')
+                    
+                    #rename sbi if it exists
+                    sbi = index_file.with_suffix('.sbi')
+                    if sbi.exists():
+                        newsbi = newcue.with_suffix('.sbi')
+                        sbi.rename(newsbi)
+                        log(f'{sbi.name} -> {newsbi.name}')
                 else:
                     newrom = rom.with_name(roms_json[0].get('name'))
                     #some containers are supported, like rvz (and maybe in the future, chd)
@@ -384,47 +393,28 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     rom.rename(newrom)
                     ok(f'{rom.name} -> {newrom.name}')
                     
-                    reset1  = rom.with_suffix('.ips')
-                    reset2  = rom.with_suffix('.bps')
-                    reset3  = rom.with_suffix('.ups')
-                    reset4  = rom.with_suffix('.rxdelta')
-                    if reset1.exists():
-                        newrom = newrom.with_suffix('.ips')
-                        reset1.rename(newrom)
-                        log(f'{reset1.name} -> {newrom.name}')
-                    elif reset2.exists():
-                        newrom = newrom.with_suffix('.bps')
-                        reset2.rename(newrom)
-                        log(f'{reset2.name} -> {newrom.name}')
-                    elif reset3.exists():
-                        newrom = newrom.with_suffix('.ups')
-                        reset3.rename(newrom)
-                        log(f'{reset3.name} -> {newrom.name}')
-                    elif reset4.exists():
-                        newrom = newrom.with_suffix('.rxdelta')
-                        reset4.rename(newrom)
-                        log(f'{reset4.name} -> {newrom.name}')
-            
+                    #It's a user error for patches of different type and same number to exist.
+                    softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
+                    if len(softpatches)>1:
+                        warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
+                    #custom hardpatch removal xdelta, subchannel data, palette nes emulator file
+                    others = [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.sbi'), rom.with_suffix('.pal') ] if r.exists() ]
+                    for p in chain(softpatches,others):
+                        newrom = newrom.with_suffix(p.suffix)
+                        p.rename(newrom)
+                        log(f'{p.name} -> {newrom.name}')
                     #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
-                    #until the number does not match. It's a user error for patches of different type and same number to exist.
+                    #until the number does not match.
                     for x in range(1, 100):
-                        next1 = reset1.with_suffix('.ips{x}')
-                        next2 = reset1.with_suffix('.bps{x}')
-                        next3 = reset1.with_suffix('.ups{x}')
-                        if next1.exists():
-                            newrom = newrom.with_suffix('.ips{x}')
-                            next1.rename(newrom)
-                            log(f'{next1.name} -> {newrom.name}')
-                        elif next2.exists():
-                            newrom = newrom.with_suffix('.bps{x}')
-                            next2.rename(newrom)
-                            log(f'{next2.name} -> {newrom.name}')
-                        elif next3.exists():
-                            newrom = newrom.with_suffix('.ups{x}')
-                            next3.rename(newrom)
-                            log(f'{next3.name} -> {newrom.name}')
-                        else:
+                        softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
+                        if not softpatches:
                             break
+                        if len(softpatches)>1:
+                            warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
+                        for softpatch in softpatches:
+                            newrom = newrom.with_suffix(softpatch.suffix)
+                            next1.rename(newrom)
+                            log(f'{softpatch.name} -> {newrom.name}')
         except PatchingError as e:
             error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
             error(f' file: {rom.name}')
@@ -575,3 +565,51 @@ def main():
 if __name__ == "__main__":
     error('Please run rhdndat or rhdndat-rn instead of running the script directly')
     raise typer.Abort()
+    
+
+    
+    
+from chd import chd_read_header, chd_open
+def chd_tracks_sha1(chdfile: Path, possible_parents: List[Path]):
+    '''
+    Try to extract a list of track sha1 sum strings from a chd
+    This method supports cd type chds
+    If passed a non-cd chd, or a delta chd without the ancestors in the list of possible parents, returns None
+    '''
+    parents_headers = [ chd_read_header(str(parent)) for parent in possible_parents ]
+    headersmap = { str(path.resolve(strict=True)) : header for path, header in zip(possible_parents, parents_headers) }
+    
+    chdfile = str(chdfile.resolve(strict=True))
+    headersmap[chdfile] = chd_read_header(chdfile)
+    
+    chd = bottom_up_chd_build(chdfile, headersmap)
+    if not chd:
+        return None
+    
+    tags = [ m.tag().to_bytes(4, byteorder='big') for m in chd.metadata() ]
+    
+    def is_cdrom(tag):
+        tag == b'CHCD' or tag == b'CHTR' or tag == b'CHT2' or tag == b'CHGT' or tag == b'CHGD'
+    
+    if not any(map(is_cdrom, tags)):
+        return None
+    
+    #do sha1sum of tracks here, draw the rest of the owl
+    return None
+
+def bottom_up_chd_build(chdfile, headers):
+    header = headers[chdfile]
+    del headers[chdfile]
+    if header.has_parent():
+        try:
+            parentfile, _ = next(filter(lambda kv: kv[1].sha1() == header.parent_sha1(), headers.items()))
+            parentchd = bottom_up_chd_build(parentfile, headers)
+            if parentchd:
+                return chd_open(chdfile, parentchd)
+            else:
+                return None
+        except StopIteration:
+            return None
+    else:
+        return chd_open(chdfile)
+
