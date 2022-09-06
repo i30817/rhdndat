@@ -346,6 +346,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #Instead of doing a complicated and unstable strategy to 'make it perfect'
             #simply find all the currently checked searched extensions in the 'game'
             #and display all for the user to choose. If none are found, skip them.
+            #If any already exists disable them. If all are disabled skip them.
             #In the case of index or container files, additionally replace the
             #extensions found by the current one.
             
@@ -364,8 +365,6 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 for name in names_to_show:
                     possibilities.append(questionary.Choice(name, value=(name,x), disabled='can\'t rename, rom exists' if Path(rom.parent, name).exists() else None))
             
-            #select no as default (always safe)
-            initial = possibilities[0]
             #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
             if all((x.disabled for x in possibilities[1:] )):
                 continue
@@ -373,7 +372,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             custom_style = Style([
                 ('answer', 'fg:green bold'),
             ])
-            choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=initial).ask()
+            choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=possibilities[0]).ask()
             if choice == None: #user ctrl+c
                 raise typer.Exit(code=1)
             if choice != 'no':
