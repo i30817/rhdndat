@@ -17,7 +17,9 @@ import signal
 import typer
 from io import DEFAULT_BUFFER_SIZE
 from itertools import chain
-from typing import Optional, List, Callable, Any
+from collections import defaultdict, OrderedDict
+from functools import reduce
+from typing import Optional, List
 from bs4 import BeautifulSoup
 import questionary
 from questionary import Style
@@ -137,8 +139,6 @@ def needs_store(x):
 def store(x, sha1):
     x['user.rhdndat.rom_sha1'] = sha1.encode('ascii')
 
-from collections import defaultdict
-from functools import reduce
 def getChecksumDict(xmls_list):
     def dictsetsum(dict1, game_tuple):
         game, origin = game_tuple
@@ -156,7 +156,8 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             xmlpath: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=True, readable=True, resolve_path=True, help='Xml dat file or directory to search for xml dat files to use as source of new names.'),
             skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directories to skip, can be used multiple times.'),
             ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.'),
-            force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
+            force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
+            norename: bool = typer.Option(False, '--no-rename', help='Check dat only, never ask for rename.'),
             verbose: bool = typer.Option(False, '--verbose', help='Print full paths of skipped undatted/incomplete roms.')
             ):
     """
@@ -221,13 +222,13 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         error(f'Can\'t find xml dats in second argument.')
         raise typer.Abort()
     if romdir in skip or any( (excluded in skip for excluded in romdir.parents) ):
-        error(f'Can\'t process any roms because ROMDIR argument is in one of the skipped directories.')
+        error('Can\'t process any roms because ROMDIR argument is in one of the skipped directories.')
         raise typer.Abort()
-    
+
     combined_dict = getChecksumDict(xmls)
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
     default_headers = {  '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128  }
-    renamed = set()
+    savedtracks = set() #saves track files to prevent them being processed twice
     sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
     for (root,dirs,files) in os.walk(romdir, topdown=True):
         #don't walk down forbidden directories, backwards delete in place for os.walk to be notified
@@ -239,14 +240,14 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         files.sort(key=lambda x: sortd.get(x.suffix.lower()) or 4)
         for rom in files:
             #skip any already processed track file
-            if rom in renamed:
+            if rom in savedtracks:
                 continue
             try:
                 #check if needs to skip bytes
                 skipped = default_headers.get(rom.suffix.lower()) or 0
                 #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
                 #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
-                files = [ rom ] #default to share code between the cue version and single file
+                tracks = []
                 index_file = None
                 index_txt = None
                 if rom.suffix.lower() == '.cue' or rom.suffix.lower() == '.gdi':
@@ -259,29 +260,29 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         if tmp.is_absolute():
                             return tmp.resolve()
                         return Path(rom.parent, tmp).resolve()
-                    files = list(map( track_constructor, re.findall('"(.*)"', index_txt)))
-                
-                #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
+                    tracks = list(map( track_constructor, re.findall('"(.*)"', index_txt)))
+                #if using a cue as indirection, remove pointed tracks from the check, and check if they exist before progressing
                 errors = 0
-                for f in files:
-                    if f in renamed:
+                for f in tracks:
+                    if f in savedtracks:
                         error('error: track was checked before index that uses it, may use absolute or relative-up paths')
                         errors += 1
-                        continue
+                        break
                     if not f.is_file():
                         error('error: missing track')
                         errors += 1
-                        continue
-                    renamed.add(f)
+                        break
+                    savedtracks.add(f)
                 if errors > 0:
                     error(f'error: please fix the {index_file.as_uri() if verbose else index_file.name} track(s)')
                     continue
-                
+                if not tracks: #share the next loop
+                    tracks = [ rom ]
                 #restore from cache or calculate and store in cache the sha1sum(s). In the case of cues/gdi, check all
                 #if the file has a corresponding .rxdelta, use that as a prior patch before calculating the checksum.
                 #rvz/chd, since they're container formats should not have rxdelta
                 games = None
-                for rfile in files:
+                for rfile in tracks:
                     #do not reuse the generators
                     generator = get_sha1(skipped)
                     checksum = None
@@ -332,13 +333,14 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     if not checksum or checksum not in combined_dict:
                         errors = 1
                         break
-
                     if not games:
                         games = set(combined_dict[checksum])
                     else:
                         games = games.intersection(combined_dict[checksum])
                 if errors > 0 or not games:
                     warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
+                    continue
+                if norename:
                     continue
                 
                 #turn back to list to use with the questionary api
@@ -379,7 +381,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     #return the name chosen and the game when asking, if the name doesn't exist
                     for name in names_to_show:
                         possibilities.append(questionary.Choice(name, value=(name,x), disabled='can\'t rename, rom exists' if Path(rom.parent, name).exists() else None))
-                
+
                 #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
                 if len(possibilities) == 1 or all((x.disabled for x in possibilities[1:] )):
                     continue
@@ -401,12 +403,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         if index_file:
                             roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
                             roms_json.pop(0) #first is the index file, discard it since we're not using the name
-                            if len(files) != len(roms_json):
+                            if len(tracks) != len(roms_json):
                                 error(f'error: {index_file.as_uri() if verbose else index_file.name} has a different number of tracks than the chosen game, skipping.')
                                 continue
                             
                             #rename tracks
-                            for oldrom, r_json in zip(files, roms_json):
+                            for oldrom, r_json in zip(tracks, roms_json):
                                 newrom = oldrom.with_name(r_json.get('name'))
                                 oldrom.rename(newrom)
                                 ok(f'{oldrom.name} -> {newrom.name}')
