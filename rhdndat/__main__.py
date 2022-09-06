@@ -220,7 +220,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     if not xmls:
         error(f'Can\'t find xml dats in second argument.')
         raise typer.Abort()
-    if any( (excluded in [romdir, romdir.parents] for excluded in skip) ):
+    if romdir in skip or any( (excluded in skip for excluded in romdir.parents) ):
         error(f'Can\'t process any roms because ROMDIR argument is in one of the skipped directories.')
         raise typer.Abort()
     
