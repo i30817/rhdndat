@@ -44,23 +44,22 @@ rhdndat-rn [OPTIONS] ROMDIR XMLPATH
   
   :XMLPATH: Xml dat file or directory to search for xml dat files to use as source of new names.  [required]
 
-  --force               This option forces a recalculation and store of
-                        checksum (in unix, on windows the calculation always
-                        happens).
   --skip DIRECTORY      Directories to skip, can be used multiple times.
-  --ext TEXT            Lowercase ROM extensions to find names of. This option
-                        can be passed more than once (once per extension).
-                        Note that you can ommit this argument to get the
-                        predefined list.  [default: a78, hdi, fdi, ngc, ws,
-                        wsc, pce, gb, gba, gbc, n64, v64, z64, 3ds, nds, nes,
-                        lnx, fds, sfc, smc, bs, nsp, 32x, gg, sms, md, iso,
-                        dim, adf, ipf, dsi, wad, cue, gdi, rvz]
-  --verbose             Print complete paths when skipping because
-                        of undatted/incomplete roms.
+  --ext TEXT            Lowercase ROM extensions to find names of. This option can
+                        be passed more than once (once per extension). Note that
+                        you can ommit this argument to get the predefined list.
+                        [default: a78, hdi, fdi, ngc, ws, wsc, pce, gb, gba, gbc,
+                        n64, v64, z64, 3ds, nds, nes, lnx, fds, sfc, smc, bs, nsp,
+                        32x, gg, sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi,
+                        rvz]
+  --force               This option forces a recalculation and store of checksum
+                        (in unix, on windows the calculation always happens).
+  --verbose             Print full paths of skipped undatted/incomplete roms.
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
   --help                Show this message and exit.
+
 
 .. [1] `scroll down and click 'prepare' to get a collection of cartidge rom .DAT files <https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily>`_.
 .. [2] `download cd/dvd roms .DAT files here <http://redump.org/downloads/>`_.
