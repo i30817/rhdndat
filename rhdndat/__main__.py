@@ -166,9 +166,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     To find the checksum of the original file for hardpatched roms, rhdndat-rn can support a custom convention for 'revert patches'. Revert patches are a patch that you apply to a hardpatched file to get the original. These have the same name as the file and extension '.rxdelta' and are done with xdelta3. I keep them for patch updates for cd images (i don't know of any emulator that supports softpatching for those, except those that support delta chd).
 
-    rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the name it finds is not equal to the current name. If the original rom name has square brackets or alternatively, no curved brackets, it preselects the option to 'skip', because those are hack conventions so the name is probably intentional.
+    rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the rom filename is not equal to the dat name proposed. It will skip the question if all the names proposed already exist in the rom directory, and not allow a rename to a name that is existing file in the rom directory.
 
-    Besides rom files, files affected by renames are cues/tracks (treated especially to not ask for every track) and the softpatch types ips, bps, ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension) and rxdelta.
+    Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cues/tracks (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
     
     'nes fds lnx a78' roms require headers and are hardcoded to ignore headers when calculating 'user.rhdndat.rom_sha1' to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
 
@@ -190,9 +190,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     
     ⁵ dolphin-tool is part of the dolphin emulator. In windows rename it 'dolphin-tool.exe', in linux you have to build it from source, then place it in the path.
     
-    To update this program with pip installed, type:
+    To update this program to the latest release with pip installed, type:
     
-    pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
+    pip install --force-reinstall rhdndat
     """
     try:
         xattr = None
@@ -558,9 +558,9 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
 
     A version file is named rhdndat.ver and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
-    To update this program with pip installed, type:
+    To update this program to the latest release with pip installed, type:
     
-    pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip    
+    pip install --force-reinstall rhdndat
     """
     
     versions = romdir.glob("**/rhdndat.ver")
