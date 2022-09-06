@@ -81,11 +81,11 @@ In linux just installing xdelta3 from the repositories is enough, in windows, pl
 In linux you'll have to build dolphin-tool (it's not built by dolphin-emu packages) and place it in ``~/.local/bin``, and in windows you can copy it from the dolphin install directory, rename it to ``dolphin-tool.exe`` and place it in the python install ``Scripts`` directory.
 
 
-+---------------------+--------------------------------------------------------------------------------------------------+
-| Linux               | ``pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip``           |
-+---------------------+--------------------------------------------------------------------------------------------------+
-| Windows             | ``python -m pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
-+---------------------+--------------------------------------------------------------------------------------------------+
++----------------+----------------------------------------------------------------------------------------+
+| Latest release | ``pip install --force-reinstall rhdndat``                                              |
++----------------+----------------------------------------------------------------------------------------+
+| Current code   | ``pip install --force-reinstall https://github.com/i30817/rhdndat/archive/master.zip`` |
++----------------+----------------------------------------------------------------------------------------+
 
 Links
 -----
