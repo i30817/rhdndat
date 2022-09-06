@@ -48,7 +48,7 @@ pycparser = "*"
 
 [[package]]
 name = "chd-rs-py"
-version = "0.1.4"
+version = "0.1.5"
 description = "Python bindings to chd-rs"
 category = "main"
 optional = false
@@ -89,7 +89,7 @@ source = ["Cython (>=0.29.7)"]
 
 [[package]]
 name = "more-itertools"
-version = "8.13.0"
+version = "8.14.0"
 description = "More routines for operating on iterables, beyond itertools"
 category = "dev"
 optional = false
@@ -319,9 +319,9 @@ cffi = [
     {file = "cffi-1.15.1.tar.gz", hash = "sha256:d400bfb9a37b1351253cb402671cea7e89bdecc294e8016a707f6d1d8ac934f9"},
 ]
 chd-rs-py = [
-    {file = "chd_rs_py-0.1.4-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:fad006e7ed25cca55349db9df9843231ea6f9055d47a4f4730466a101d3f07d7"},
-    {file = "chd_rs_py-0.1.4-cp37-none-win_amd64.whl", hash = "sha256:160fc9533deefd76924d92e7f8a0c440f47bd2116bc815c7854805166f70076e"},
-    {file = "chd_rs_py-0.1.4.tar.gz", hash = "sha256:16a2d339f74164bfe8767fd6e241153cbfeca9f70374f0bade305c4c52f171d9"},
+    {file = "chd_rs_py-0.1.5-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:6cbab79f57a7a03caa835714bd754ddced8eb60264c5dc13f1168a89b3670ec6"},
+    {file = "chd_rs_py-0.1.5-cp37-none-win_amd64.whl", hash = "sha256:a7296be51a1ce0e1e5f65cbb8eed44c9339f4b45f39a027c8c943b0c77bb0871"},
+    {file = "chd_rs_py-0.1.5.tar.gz", hash = "sha256:2d2711373a4ce0a80b8084b1126efe00c090cb7762741ec2b2ae5d11925de422"},
 ]
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
@@ -404,8 +404,8 @@ lxml = [
     {file = "lxml-4.9.1.tar.gz", hash = "sha256:fe749b052bb7233fe5d072fcb549221a8cb1a16725c47c37e42b0b9cb3ff2c3f"},
 ]
 more-itertools = [
-    {file = "more-itertools-8.13.0.tar.gz", hash = "sha256:a42901a0a5b169d925f6f217cd5a190e32ef54360905b9c39ee7db5313bfec0f"},
-    {file = "more_itertools-8.13.0-py3-none-any.whl", hash = "sha256:c5122bffc5f104d37c1626b8615b511f3427aa5389b94d61e5ef8236bfbc3ddb"},
+    {file = "more-itertools-8.14.0.tar.gz", hash = "sha256:c09443cd3d5438b8dafccd867a6bc1cb0894389e90cb53d227456b0b0bccb750"},
+    {file = "more_itertools-8.14.0-py3-none-any.whl", hash = "sha256:1bc4f91ee5b1b31ac7ceacc17c09befe6a40a503907baf9c839c229b5095cfd2"},
 ]
 packaging = [
     {file = "packaging-21.3-py3-none-any.whl", hash = "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"},

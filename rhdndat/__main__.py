@@ -12,7 +12,6 @@ from urllib.request import urlopen
 from urllib.error import URLError
 from pathlib import Path
 from hashlib import sha1
-from functools import reduce
 import re
 import signal
 import typer
@@ -138,18 +137,17 @@ def needs_store(x):
 def store(x, sha1):
     x['user.rhdndat.rom_sha1'] = sha1.encode('ascii')
 
-def getdict(elems, rf):
-    #print(rf)
-    d = dict()
-    for x in elems:
-        for r in x.find_all('rom'):
-            d.setdefault(r.get('sha1'), list()).append(  x  )
-    return d
-        
-def dictsetsum(dict1, dict2):
-    for x,s in dict2.items():
-        dict1[x] = dict1.setdefault(x, list()) + s
-    return dict1
+from collections import defaultdict
+from functools import reduce
+def getChecksumDict(xmls_list):
+    def dictsetsum(dict1, game_tuple):
+        game, origin = game_tuple
+        #game['origin'] = origin #currently not needed unless you want to display the dat origin, which is ugly
+        for r in game.find_all('rom'):
+            dict1[r.get('sha1')].append(game)
+        return dict1
+    lazy_sequence = ( (x,y.name) for y in xmls_list for x in BeautifulSoup(open(y), features="xml").find_all('game'))
+    return reduce(dictsetsum, lazy_sequence, defaultdict(list))
 
 #this method might rename files.
 #since we use dats to get the possible new filenames from the 'rom name' entry
@@ -157,7 +155,9 @@ def dictsetsum(dict1, dict2):
 def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             xmlpath: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=True, readable=True, resolve_path=True, help='Xml dat file or directory to search for xml dat files to use as source of new names.'),
             force: bool = typer.Option(False, '--force', help='This option forces a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
-            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.')
+            skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directories to skip, can be used multiple times.'),
+            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.'),
+            verbose: bool = typer.Option(False, '--verbose', help='Print complete paths when skipping because of undatted/incomplete roms.')
             ):
     """
     rom renamer
@@ -221,22 +221,22 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         error(f'Can\'t find xml dats in second argument.')
         raise typer.Abort()
     
-    dicts = map( lambda x: getdict(BeautifulSoup(open(x), features="xml").find_all('game'), x) ,  xmls)
-    combined_dict = reduce(dictsetsum, dicts, dict())
-    ext = list(map( lambda s: s if s.startswith('.') else '.' + s, ext))
+    combined_dict = getChecksumDict(xmls)
+    ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
     default_headers = {  '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128  }
     renamed = set()
     for rom in (p.resolve() for p in romdir.glob('**/*') if p.suffix.lower() in ext):
-        previous_signal = None
+        if any( (excluded in rom.parents for excluded in skip) ):
+            continue
         try:
             if rom in renamed: #might have been already renamed from cue processing
                 continue
             
             #check if needs to skip bytes
             try:
-                skip = default_headers[rom.suffix.lower()]
+                skipped = default_headers[rom.suffix.lower()]
             except KeyError as e:
-                skip = 0
+                skipped = 0
             
             #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
             #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
@@ -254,22 +254,21 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             errors = 0
             for f in files:
                 if not f.is_file():
-                    error(f'error: {index_file.name} missing track {f}')
+                    error(f'error: missing track {f}')
                     errors += 1
                     continue
                 renamed.add(f)
             if errors > 0:
-                error(f'error: please fix the cue track(s)')
+                error(f'error: please fix the {index_file.as_posix() if verbose else index_file.name} track(s)')
                 continue
             
             #restore from cache or calculate and store in cache the sha1sum(s). In the case of cues/gdi, check all
             #if the file has a corresponding .rxdelta, use that as a prior patch before calculating the checksum.
-            #rvz, since they're container formats should not have rxdelta
-            #only output the 'games' that have all files checksums.
+            #rvz/chd, since they're container formats should not have rxdelta
             games = None
             for rfile in files:
                 #do not reuse the generators
-                generator = get_sha1(skip)
+                generator = get_sha1(skipped)
                 checksum = None
                 if rfile.suffix.lower() == '.rvz':
                     if xattr:
@@ -293,6 +292,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     if xattr:
                         x = xattr.xattr(rfile)
                         should_store = force or needs_store(x)
+                        #warn(f'store {should_store}: {rom.name}')
                         if patch.is_file():
                             if should_store:
                                 if xdelta:
@@ -313,108 +313,142 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         else:
                            checksum = file_producer(rfile, generator)
                 #find the games where all 'roms' checked are represented
+                #for instance, we do not want to add games that share a music track like tombraider 1 and 2
                 if not checksum or checksum not in combined_dict:
                     errors = 1
                     break
+
                 if not games:
                     games = set(combined_dict[checksum])
                 else:
                     games = games.intersection(combined_dict[checksum])
-            if not games or errors > 0:
-                warn(f'undatted/incomplete: {rom.name}')
+            if errors > 0 or not games:
+                warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
                 continue
+            
             #turn back to list to use with the questionary api
             games = list(games)
             
-            #ignore keyboard signal to not fuck up the renames of cues if using it 
-            #(waits until it's out of the critical section, if you keep pressed)
-            previous_signal = signal.signal(signal.SIGINT, signal.SIG_IGN)
             
-            possibilities = ['no'] + list( map( lambda x: x.get('name'), games ) )
+            #Jargon: chd/rvz are 'container' files, cue/gdi/toc are 'index' files.
+            #'games' are dat entries where all the roms searched matched.
+            #Neither container or index files are checked for being part of games.
+            #Container files for obvious reasons, and index files to allow different
+            #formats to still match the same data and the fact they embed filenames.
+            #They're also the only files that never can change extension for that reason.
             
-            default_i = possibilities[-1]
-            if rom.stem in possibilities:
-                default_i = rom.stem
-                if len(possibilities) == 2:
-                    continue
-            if '(' not in rom.name: #likely hack! default to 'no'
-                default_i = 'no'
-
+            #unfortunately here is a big difference between dat files. Some of them (redump)
+            #place always one and only one 'complete' medium per 'game' (cue/bin being 1 too).
+            #for others, however, i found counterexamples like one where 2 isos are in a
+            #single 'game' (Legend of Heroes - Trails in the Sky - Second Chapter).
+            #This makes it problematic to find the new name in that unusual case.
+            
+            #Instead of doing a complicated and unstable strategy to 'make it perfect'
+            #simply find all the currently checked searched extensions in the 'game'
+            #and display all for the user to choose. If none are found, skip them.
+            #In the case of index or container files, additionally replace the
+            #extensions found by the current one.
+            
+            #always lowercase extensions even if the current file has a different case
+            suffix = rom.suffix.lower()
+            will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
+            possibilities = [questionary.Choice('no')]
+            for x in games:
+                def find_candidate_names(n):
+                    #lower is jut to be safe, i doubt that there are many dat files with uppercase extensions
+                    return Path(n).suffix.lower() in ext
+                names_to_show = ( y['name'] for y in x.find_all('rom', attrs={"name": find_candidate_names}) )
+                if will_replace_extension:
+                    names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
+                #return the name chosen and the game when asking, if the name doesn't exist
+                for name in names_to_show:
+                    possibilities.append(questionary.Choice(name, value=(name,x), disabled='can\'t rename, rom exists' if Path(rom.parent, name).exists() else None))
+            
+            #select no as default (always safe)
+            initial = possibilities[0]
+            #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
+            if all((x.disabled for x in possibilities[1:] )):
+                continue
+            
             custom_style = Style([
                 ('answer', 'fg:green bold'),
             ])
-            choice = questionary.select(f'rename {rom.stem} ?', possibilities, style=custom_style, qmark='', default=default_i).ask()
-            index = possibilities.index(choice)
+            choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=initial).ask()
+            if choice == None: #user ctrl+c
+                raise typer.Exit(code=1)
             if choice != 'no':
-                game = games[index-1]
-                roms_json = game.find_all('rom') #ordered by insertion order, just like the cue file parser above
-                if index_file:
-                    newcue = roms_json.pop(0) #first is the cue/gdi
-            
-                    confirm = len(files) == len(roms_json)
-                    
-                    if not confirm:
-                        error(f'error: {index_file.name} has a different number of tracks than the chosen game {choice}, skipping.')
-                        continue
-                    
-                    #rename tracks
-                    for oldrom, r_json in zip(files, roms_json):
-                        newrom = oldrom.with_name(r_json.get('name'))
-                        oldrom.rename(newrom)
-                        ok(f'{oldrom.name} -> {newrom.name}')
-                        #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
-                        index_txt = index_txt.replace(oldrom.name, newrom.name)
+                #ignore keyboard signal to not fuck up the renames of cues if using it 
+                #(waits until it's out of the critical section, if you keep pressed)
+                def handler(signum, frame):
+                    print('CTRL-C ignored while renaming files')
+                previous_signal = signal.signal(signal.SIGINT,handler)
+                try:
+                    new_name, game = choice
+                    if index_file:
+                        roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
+                        roms_json.pop(0) #first is the index file, discard it since we're not using the name
+                        if len(files) != len(roms_json):
+                            error(f'error: {index_file.name} has a different number of tracks than the chosen game {new_name}, skipping.')
+                            continue
                         
-                        #patch sibling file types that need to change name if the file changes name
-                        oldpatch = oldrom.with_name(oldrom.stem+'.rxdelta')
-                        if oldpatch.exists():
-                            newpatch = oldrom.with_name(newrom.stem+'.rxdelta')
-                            oldpatch.rename(newpatch)
-                            log(f'{oldpatch.name} -> {newpatch.name}')
-                    
-                    #rename and rewrite cue
-                    newcue = index_file.with_name(newcue.get('name'))
-                    index_file.rename(newcue)
-                    newcue.write_text(index_txt, encoding='utf-8')
-                    ok(f'{index_file.name} -> {newcue.name}')
-                    
-                    #rename sbi if it exists
-                    sbi = index_file.with_suffix('.sbi')
-                    if sbi.exists():
-                        newsbi = newcue.with_suffix('.sbi')
-                        sbi.rename(newsbi)
-                        log(f'{sbi.name} -> {newsbi.name}')
-                else:
-                    newrom = rom.with_name(roms_json[0].get('name'))
-                    #some containers are supported, like rvz (and maybe in the future, chd)
-                    if rom.suffix.lower() == '.rvz' and '.rvz' != newrom.suffix:
-                        newrom = newrom.with_suffix(rom.suffix)
-                    
-                    rom.rename(newrom)
-                    ok(f'{rom.name} -> {newrom.name}')
-                    
-                    #It's a user error for patches of different type and same number to exist.
-                    softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
-                    if len(softpatches)>1:
-                        warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
-                    #custom hardpatch removal xdelta, subchannel data, palette nes emulator file
-                    others = [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.sbi'), rom.with_suffix('.pal') ] if r.exists() ]
-                    for p in chain(softpatches,others):
-                        newrom = newrom.with_suffix(p.suffix)
-                        p.rename(newrom)
-                        log(f'{p.name} -> {newrom.name}')
-                    #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
-                    #until the number does not match.
-                    for x in range(1, 100):
-                        softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
-                        if not softpatches:
-                            break
+                        #rename tracks
+                        for oldrom, r_json in zip(files, roms_json):
+                            newrom = oldrom.with_name(r_json.get('name'))
+                            oldrom.rename(newrom)
+                            ok(f'{oldrom.name} -> {newrom.name}')
+                            #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
+                            index_txt = index_txt.replace(oldrom.name, newrom.name)
+                            
+                            #patch sibling file types that need to change name if the file changes name
+                            oldpatch = oldrom.with_name(oldrom.stem+'.rxdelta')
+                            if oldpatch.exists():
+                                newpatch = oldrom.with_name(newrom.stem+'.rxdelta')
+                                oldpatch.rename(newpatch)
+                                log(f'{oldpatch.name} -> {newpatch.name}')
+                        
+                        #rename and rewrite index file
+                        newcue = index_file.with_name(new_name)
+                        index_file.rename(newcue)
+                        newcue.write_text(index_txt, encoding='utf-8')
+                        ok(f'{index_file.name} -> {newcue.name}')
+                        
+                        #rename sbi if it exists
+                        sbi = index_file.with_suffix('.sbi')
+                        if sbi.exists():
+                            newsbi = newcue.with_suffix('.sbi')
+                            sbi.rename(newsbi)
+                            log(f'{sbi.name} -> {newsbi.name}')
+                    else:
+                        newrom = rom.with_name(new_name)
+                        rom.rename(newrom)
+                        ok(f'{rom.name} -> {newrom.name}')
+                        
+                        #It's a user error for patches of different type and same number to exist.
+                        softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
                         if len(softpatches)>1:
                             warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
-                        for softpatch in softpatches:
-                            newrom = newrom.with_suffix(softpatch.suffix)
-                            next1.rename(newrom)
-                            log(f'{softpatch.name} -> {newrom.name}')
+                        #custom hardpatch removal xdelta, subchannel data, palette nes emulator file
+                        others = [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.sbi'), rom.with_suffix('.pal') ] if r.exists() ]
+                        for p in chain(softpatches,others):
+                            newrom = newrom.with_suffix(p.suffix)
+                            p.rename(newrom)
+                            log(f'{p.name} -> {newrom.name}')
+                        #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
+                        #until the number does not match.
+                        for x in range(1, 100):
+                            softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
+                            if not softpatches:
+                                break
+                            if len(softpatches)>1:
+                                warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
+                            for softpatch in softpatches:
+                                newrom = newrom.with_suffix(softpatch.suffix)
+                                next1.rename(newrom)
+                                log(f'{softpatch.name} -> {newrom.name}')
+                finally:
+                    #reneable keyboard kills
+                    if previous_signal:
+                        signal.signal(signal.SIGINT, previous_signal)
         except PatchingError as e:
             error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
             error(f' file: {rom.name}')
@@ -422,10 +456,6 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             continue
         except KeyError as e:
             continue #not a rom
-        finally:
-            #reneable keyboard kills
-            if previous_signal:
-                signal.signal(signal.SIGINT, previous_signal)
 
 def is_rhdn_translation(url_str):
     return 'www.romhacking.net/translations' in url_str
@@ -520,7 +550,7 @@ def get_romhacking_data(possible_metadata):
 
 
 def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.'),
-    quiet: bool = typer.Option(False, help='Don\'t show the directory of the each checked rhdndat.ver file.')
+    quiet: bool = typer.Option(False, '--quiet', help='Don\'t show the directory of the each checked rhdndat.ver file.')
     ):
     """
     romhacking.net update checker
@@ -567,49 +597,55 @@ if __name__ == "__main__":
     raise typer.Abort()
     
 
-    
-    
-from chd import chd_read_header, chd_open
-def chd_tracks_sha1(chdfile: Path, possible_parents: List[Path]):
-    '''
-    Try to extract a list of track sha1 sum strings from a chd
-    This method supports cd type chds
-    If passed a non-cd chd, or a delta chd without the ancestors in the list of possible parents, returns None
-    '''
-    parents_headers = [ chd_read_header(str(parent)) for parent in possible_parents ]
-    headersmap = { str(path.resolve(strict=True)) : header for path, header in zip(possible_parents, parents_headers) }
-    
-    chdfile = str(chdfile.resolve(strict=True))
-    headersmap[chdfile] = chd_read_header(chdfile)
-    
-    chd = bottom_up_chd_build(chdfile, headersmap)
-    if not chd:
-        return None
-    
-    tags = [ m.tag().to_bytes(4, byteorder='big') for m in chd.metadata() ]
-    
-    def is_cdrom(tag):
-        tag == b'CHCD' or tag == b'CHTR' or tag == b'CHT2' or tag == b'CHGT' or tag == b'CHGD'
-    
-    if not any(map(is_cdrom, tags)):
-        return None
-    
-    #do sha1sum of tracks here, draw the rest of the owl
-    return None
 
-def bottom_up_chd_build(chdfile, headers):
-    header = headers[chdfile]
-    del headers[chdfile]
-    if header.has_parent():
-        try:
-            parentfile, _ = next(filter(lambda kv: kv[1].sha1() == header.parent_sha1(), headers.items()))
-            parentchd = bottom_up_chd_build(parentfile, headers)
-            if parentchd:
-                return chd_open(chdfile, parentchd)
-            else:
-                return None
-        except StopIteration:
-            return None
-    else:
-        return chd_open(chdfile)
+#from chd import chd_read_header, chd_open, ChdError
+#from hashlib import sha1
+#def chd_sha1(chdfile: Path, possible_parents: List[Path] = []):
+#    '''
+#    Try to extract a list of sha1 sum strings from a chd that can be used on a dat file
+#    This method supports cd type chds (returns tracks sha1) and non-cd chd (returns chd sha1)
+#    But delta chd without all the ancestors in the list, or not a chd returns None
+#    '''
+#    parents_headers = [ chd_read_header(str(parent)) for parent in possible_parents ]
+#    try:
+#        headersmap = { str(path.resolve(strict=True)) : header for path, header in zip(possible_parents, parents_headers) }
+#        chdfile = str(chdfile.resolve(strict=True))
+#        headersmap[chdfile] = chd_read_header(chdfile)
+#        
+#        chd = bottom_up_chd_build(chdfile, headersmap)
+#        if not chd:
+#            return None
+#        
+#        tags = [ m.tag().to_bytes(4, byteorder='big') for m in chd.metadata() ]
+#        def is_cdrom(tag):
+#            return tag == b'CHCD' or tag == b'CHTR' or tag == b'CHT2' or tag == b'CHGT' or tag == b'CHGD'
+#        
+#        if not any(map(is_cdrom, tags)):
+#            return [headersmap[chdfile].sha1]
+#        
+#        #do sha1sum of tracks here, draw the rest of the owl
+#        checksum = sha1()
+#        
+#        for tag in tags:
+#            
+#        
+#        return chd
+#    except (FileNotFoundError, ChdError):
+#        return None
+
+#def bottom_up_chd_build(chdfile, headers):
+#    header = headers[chdfile]
+#    del headers[chdfile]
+#    if header.has_parent():
+#        try:
+#            parentfile, _ = next(filter(lambda kv: kv[1].sha1() == header.parent_sha1(), headers.items()))
+#            parentchd = bottom_up_chd_build(parentfile, headers)
+#            if parentchd:
+#                return chd_open(chdfile, parentchd)
+#            else:
+#                return None
+#        except StopIteration:
+#            return None
+#    else:
+#        return chd_open(chdfile)
 
