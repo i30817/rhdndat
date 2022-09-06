@@ -220,241 +220,256 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     if not xmls:
         error(f'Can\'t find xml dats in second argument.')
         raise typer.Abort()
+    if any( (excluded in [romdir, romdir.parents] for excluded in skip) ):
+        error(f'Can\'t process any roms because ROMDIR argument is in one of the skipped directories.')
+        raise typer.Abort()
     
     combined_dict = getChecksumDict(xmls)
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
     default_headers = {  '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128  }
     renamed = set()
-    for rom in (p.resolve() for p in romdir.glob('**/*') if p.suffix.lower() in ext):
-        if any( (excluded in rom.parents for excluded in skip) ):
-            continue
-        try:
-            if rom in renamed: #might have been already renamed from cue processing
+    sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
+    for (root,dirs,files) in os.walk(romdir, topdown=True):
+        #don't walk down forbidden directories, backwards delete in place for os.walk to be notified
+        for i in range(len(dirs) - 1, -1, -1):
+            if Path(root, dirs[i]) in skip:
+                del dirs[i]
+        #filter files in each directory to have only the extensions we want, sorted so index files come first
+        files = [ Path(root, p).resolve() for p in files if os.path.splitext(p)[1].lower() in ext ]
+        files.sort(key=lambda x: sortd.get(x.suffix.lower()) or 4)
+        for rom in files:
+            #skip any already processed track file
+            if rom in renamed:
                 continue
-            
-            #check if needs to skip bytes
             try:
-                skipped = default_headers[rom.suffix.lower()]
-            except KeyError as e:
-                skipped = 0
-            
-            #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
-            #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
-            files = [ rom ] #default to share code between the cue version and single file
-            index_file = None
-            index_txt = None
-            if rom.suffix.lower() == '.cue' or rom.suffix.lower() == '.gdi':
-                with open(rom, 'r') as fcue:
-                    index_txt = fcue.read()
-                index_file = rom
-                #instead of considering just the 'rom' file, consider also all file tracks inside cue or gdi
-                files = list(map( lambda x: Path(x) if Path(x).is_absolute() else Path(rom.parent,x), re.findall('"(.*)"', index_txt)))
-            
-            #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
-            errors = 0
-            for f in files:
-                if not f.is_file():
-                    error(f'error: missing track {f}')
-                    errors += 1
+                #check if needs to skip bytes
+                skipped = default_headers.get(rom.suffix.lower()) or 0
+                #cues/gdi are handled especially to not have to bother confirming changing dozens of tracks (xattr are stored on tracks)
+                #however, this code does not handle tracks that were accidentaly renamed or unavailable. It will skip then.
+                files = [ rom ] #default to share code between the cue version and single file
+                index_file = None
+                index_txt = None
+                if rom.suffix.lower() == '.cue' or rom.suffix.lower() == '.gdi':
+                    with open(rom, 'r') as fcue:
+                        index_txt = fcue.read()
+                    index_file = rom
+                    #instead of considering just the 'rom' file, consider also all file tracks inside cue or gdi
+                    def track_constructor(st):
+                        tmp = Path(st)
+                        if tmp.is_absolute():
+                            return tmp.resolve()
+                        return Path(rom.parent, tmp).resolve()
+                    files = list(map( track_constructor, re.findall('"(.*)"', index_txt)))
+                
+                #if using a cue as indirection, remove the other files from the check, and check if they exist before progressing
+                errors = 0
+                for f in files:
+                    if f in renamed:
+                        error('error: track was checked before index that uses it, may use absolute or relative-up paths')
+                        errors += 1
+                        continue
+                    if not f.is_file():
+                        error('error: missing track')
+                        errors += 1
+                        continue
+                    renamed.add(f)
+                if errors > 0:
+                    error(f'error: please fix the {index_file.as_uri() if verbose else index_file.name} track(s)')
                     continue
-                renamed.add(f)
-            if errors > 0:
-                error(f'error: please fix the {index_file.as_posix() if verbose else index_file.name} track(s)')
-                continue
-            
-            #restore from cache or calculate and store in cache the sha1sum(s). In the case of cues/gdi, check all
-            #if the file has a corresponding .rxdelta, use that as a prior patch before calculating the checksum.
-            #rvz/chd, since they're container formats should not have rxdelta
-            games = None
-            for rfile in files:
-                #do not reuse the generators
-                generator = get_sha1(skipped)
-                checksum = None
-                if rfile.suffix.lower() == '.rvz':
-                    if xattr:
-                        x = xattr.xattr(rfile)
-                        should_store = force or needs_store(x)
-                        if should_store:
+                
+                #restore from cache or calculate and store in cache the sha1sum(s). In the case of cues/gdi, check all
+                #if the file has a corresponding .rxdelta, use that as a prior patch before calculating the checksum.
+                #rvz/chd, since they're container formats should not have rxdelta
+                games = None
+                for rfile in files:
+                    #do not reuse the generators
+                    generator = get_sha1(skipped)
+                    checksum = None
+                    if rfile.suffix.lower() == '.rvz':
+                        if xattr:
+                            x = xattr.xattr(rfile)
+                            should_store = force or needs_store(x)
+                            if should_store:
+                                if dolphin:
+                                    process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
+                                    process.check_returncode()
+                                    checksum = process.stdout.strip()
+                                    store(x, checksum)
+                            else:
+                                checksum = read(x)
+                        else:
                             if dolphin:
                                 process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
                                 process.check_returncode()
                                 checksum = process.stdout.strip()
-                                store(x, checksum)
-                        else:
-                            checksum = read(x)
                     else:
-                        if dolphin:
-                            process = subprocess.run( [dolphin, 'verify', '-a', 'sha1', '-i', rfile], text=True, capture_output=True)
-                            process.check_returncode()
-                            checksum = process.stdout.strip()
-                else:
-                    patch = rfile.with_suffix('.rxdelta')
-                    if xattr:
-                        x = xattr.xattr(rfile)
-                        should_store = force or needs_store(x)
-                        #warn(f'store {should_store}: {rom.name}')
-                        if patch.is_file():
-                            if should_store:
+                        patch = rfile.with_suffix('.rxdelta')
+                        if xattr:
+                            x = xattr.xattr(rfile)
+                            should_store = force or needs_store(x)
+                            #warn(f'store {should_store}: {rom.name}')
+                            if patch.is_file():
+                                if should_store:
+                                    if xdelta:
+                                       checksum = producer_unix([xdelta, '-d', '-s',  rfile, patch],  generator)
+                                       store(x, checksum)
+                                else:
+                                    checksum = read(x)
+                            else:
+                                if should_store:
+                                    checksum = file_producer(rfile, generator)
+                                    store(x, checksum)
+                                else:
+                                    checksum = read(x)
+                        else:
+                            if patch.is_file():
                                 if xdelta:
-                                   checksum = producer_unix([xdelta, '-d', '-s',  rfile, patch],  generator)
-                                   store(x, checksum)
+                                    checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
                             else:
-                                checksum = read(x)
-                        else:
-                            if should_store:
-                                checksum = file_producer(rfile, generator)
-                                store(x, checksum)
-                            else:
-                                checksum = read(x)
-                    else:
-                        if patch.is_file():
-                            if xdelta:
-                                checksum = producer_windows([xdelta, '-d', '-s',  rfile, patch],  generator)
-                        else:
-                           checksum = file_producer(rfile, generator)
-                #find the games where all 'roms' checked are represented
-                #for instance, we do not want to add games that share a music track like tombraider 1 and 2
-                if not checksum or checksum not in combined_dict:
-                    errors = 1
-                    break
+                               checksum = file_producer(rfile, generator)
+                    #find the games where all 'roms' checked are represented
+                    #for instance, we do not want to add games that share a music track like tombraider 1 and 2
+                    if not checksum or checksum not in combined_dict:
+                        errors = 1
+                        break
 
-                if not games:
-                    games = set(combined_dict[checksum])
-                else:
-                    games = games.intersection(combined_dict[checksum])
-            if errors > 0 or not games:
-                warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
-                continue
-            
-            #turn back to list to use with the questionary api
-            games = list(games)
-            
-            
-            #Jargon: chd/rvz are 'container' files, cue/gdi/toc are 'index' files.
-            #'games' are dat entries where all the roms searched matched.
-            #Neither container or index files are checked for being part of games.
-            #Container files for obvious reasons, and index files to allow different
-            #formats to still match the same data and the fact they embed filenames.
-            #They're also the only files that never can change extension for that reason.
-            
-            #unfortunately here is a big difference between dat files. Some of them (redump)
-            #place always one and only one 'complete' medium per 'game' (cue/bin being 1 too).
-            #for others, however, i found counterexamples like one where 2 isos are in a
-            #single 'game' (Legend of Heroes - Trails in the Sky - Second Chapter).
-            #This makes it problematic to find the new name in that unusual case.
-            
-            #Instead of doing a complicated and unstable strategy to 'make it perfect'
-            #simply find all the currently checked searched extensions in the 'game'
-            #and display all for the user to choose. If none are found, skip them.
-            #If any already exists disable them. If all are disabled skip them.
-            #In the case of index or container files, additionally replace the
-            #extensions found by the current one.
-            
-            #always lowercase extensions even if the current file has a different case
-            suffix = rom.suffix.lower()
-            will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
-            possibilities = [questionary.Choice('no')]
-            for x in games:
-                def find_candidate_names(n):
-                    #lower is jut to be safe, i doubt that there are many dat files with uppercase extensions
-                    return Path(n).suffix.lower() in ext
-                names_to_show = ( y['name'] for y in x.find_all('rom', attrs={"name": find_candidate_names}) )
-                if will_replace_extension:
-                    names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
-                #return the name chosen and the game when asking, if the name doesn't exist
-                for name in names_to_show:
-                    possibilities.append(questionary.Choice(name, value=(name,x), disabled='can\'t rename, rom exists' if Path(rom.parent, name).exists() else None))
-            
-            #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
-            if all((x.disabled for x in possibilities[1:] )):
-                continue
-            
-            custom_style = Style([
-                ('answer', 'fg:green bold'),
-            ])
-            choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=possibilities[0]).ask()
-            if choice == None: #user ctrl+c
-                raise typer.Exit(code=1)
-            if choice != 'no':
-                #ignore keyboard signal to not fuck up the renames of cues if using it 
-                #(waits until it's out of the critical section, if you keep pressed)
-                def handler(signum, frame):
-                    print('CTRL-C ignored while renaming files')
-                previous_signal = signal.signal(signal.SIGINT,handler)
-                try:
-                    new_name, game = choice
-                    if index_file:
-                        roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
-                        roms_json.pop(0) #first is the index file, discard it since we're not using the name
-                        if len(files) != len(roms_json):
-                            error(f'error: {index_file.name} has a different number of tracks than the chosen game {new_name}, skipping.')
-                            continue
-                        
-                        #rename tracks
-                        for oldrom, r_json in zip(files, roms_json):
-                            newrom = oldrom.with_name(r_json.get('name'))
-                            oldrom.rename(newrom)
-                            ok(f'{oldrom.name} -> {newrom.name}')
-                            #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
-                            index_txt = index_txt.replace(oldrom.name, newrom.name)
-                            
-                            #patch sibling file types that need to change name if the file changes name
-                            oldpatch = oldrom.with_name(oldrom.stem+'.rxdelta')
-                            if oldpatch.exists():
-                                newpatch = oldrom.with_name(newrom.stem+'.rxdelta')
-                                oldpatch.rename(newpatch)
-                                log(f'{oldpatch.name} -> {newpatch.name}')
-                        
-                        #rename and rewrite index file
-                        newcue = index_file.with_name(new_name)
-                        index_file.rename(newcue)
-                        newcue.write_text(index_txt, encoding='utf-8')
-                        ok(f'{index_file.name} -> {newcue.name}')
-                        
-                        #rename sbi if it exists
-                        sbi = index_file.with_suffix('.sbi')
-                        if sbi.exists():
-                            newsbi = newcue.with_suffix('.sbi')
-                            sbi.rename(newsbi)
-                            log(f'{sbi.name} -> {newsbi.name}')
+                    if not games:
+                        games = set(combined_dict[checksum])
                     else:
-                        newrom = rom.with_name(new_name)
-                        rom.rename(newrom)
-                        ok(f'{rom.name} -> {newrom.name}')
-                        
-                        #It's a user error for patches of different type and same number to exist.
-                        softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
-                        if len(softpatches)>1:
-                            warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
-                        #custom hardpatch removal xdelta, subchannel data, palette nes emulator file
-                        others = [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.sbi'), rom.with_suffix('.pal') ] if r.exists() ]
-                        for p in chain(softpatches,others):
-                            newrom = newrom.with_suffix(p.suffix)
-                            p.rename(newrom)
-                            log(f'{p.name} -> {newrom.name}')
-                        #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
-                        #until the number does not match.
-                        for x in range(1, 100):
-                            softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
-                            if not softpatches:
-                                break
+                        games = games.intersection(combined_dict[checksum])
+                if errors > 0 or not games:
+                    warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
+                    continue
+                
+                #turn back to list to use with the questionary api
+                games = list(games)
+                
+                
+                #Jargon: chd/rvz are 'container' files, cue/gdi/toc are 'index' files.
+                #'games' are dat entries where all the roms searched matched.
+                #Neither container or index files are checked for being part of games.
+                #Container files for obvious reasons, and index files to allow different
+                #formats to still match the same data and the fact they embed filenames.
+                #They're also the only files that never can change extension for that reason.
+                
+                #unfortunately here is a big difference between dat files. Some of them (redump)
+                #place always one and only one 'complete' medium per 'game' (cue/bin being 1 too).
+                #for others, however, i found counterexamples like one where 2 isos are in a
+                #single 'game' (Legend of Heroes - Trails in the Sky - Second Chapter).
+                #This makes it problematic to find the new name in that unusual case.
+                
+                #Instead of doing a complicated and unstable strategy to 'make it perfect'
+                #simply find all the currently checked searched extensions in the 'game'
+                #and display all for the user to choose. If none are found, skip them.
+                #If any already exists disable them. If all are disabled skip them.
+                #In the case of index or container files, additionally replace the
+                #extensions found by the current one.
+                
+                #always lowercase extensions even if the current file has a different case
+                suffix = rom.suffix.lower()
+                will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
+                possibilities = [questionary.Choice('no')]
+                for x in games:
+                    def find_candidate_names(n):
+                        #lower is just to be safe, i doubt that there are many dat files with uppercase extensions
+                        return Path(n).suffix.lower() in ext
+                    names_to_show = ( y['name'] for y in x.find_all('rom', attrs={"name": find_candidate_names}) )
+                    if will_replace_extension:
+                        names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
+                    #return the name chosen and the game when asking, if the name doesn't exist
+                    for name in names_to_show:
+                        possibilities.append(questionary.Choice(name, value=(name,x), disabled='can\'t rename, rom exists' if Path(rom.parent, name).exists() else None))
+                
+                #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
+                if len(possibilities) == 1 or all((x.disabled for x in possibilities[1:] )):
+                    continue
+                
+                custom_style = Style([
+                    ('answer', 'fg:green bold'),
+                ])
+                choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=possibilities[0]).ask()
+                if choice == None: #user ctrl+c
+                    raise typer.Exit(code=1)
+                if choice != 'no':
+                    #ignore keyboard signal to not fuck up the renames of cues if using it 
+                    #(waits until it's out of the critical section, if you keep pressed)
+                    def handler(signum, frame):
+                        print('CTRL-C ignored while renaming files')
+                    previous_signal = signal.signal(signal.SIGINT,handler)
+                    try:
+                        new_name, game = choice
+                        if index_file:
+                            roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
+                            roms_json.pop(0) #first is the index file, discard it since we're not using the name
+                            if len(files) != len(roms_json):
+                                error(f'error: {index_file.as_uri() if verbose else index_file.name} has a different number of tracks than the chosen game, skipping.')
+                                continue
+                            
+                            #rename tracks
+                            for oldrom, r_json in zip(files, roms_json):
+                                newrom = oldrom.with_name(r_json.get('name'))
+                                oldrom.rename(newrom)
+                                ok(f'{oldrom.name} -> {newrom.name}')
+                                #replace the 'last part' of a filename in the same dir - this way it doesn't matter if the original was absolute or relative in the cue.
+                                index_txt = index_txt.replace(oldrom.name, newrom.name)
+                                
+                                #patch sibling file types that need to change name if the file changes name
+                                oldpatch = oldrom.with_name(oldrom.stem+'.rxdelta')
+                                if oldpatch.exists():
+                                    newpatch = oldrom.with_name(newrom.stem+'.rxdelta')
+                                    oldpatch.rename(newpatch)
+                                    log(f'{oldpatch.name} -> {newpatch.name}')
+                            
+                            #rename and rewrite index file
+                            newcue = index_file.with_name(new_name)
+                            index_file.rename(newcue)
+                            newcue.write_text(index_txt, encoding='utf-8')
+                            ok(f'{index_file.name} -> {newcue.name}')
+                            
+                            #rename sbi if it exists
+                            sbi = index_file.with_suffix('.sbi')
+                            if sbi.exists():
+                                newsbi = newcue.with_suffix('.sbi')
+                                sbi.rename(newsbi)
+                                log(f'{sbi.name} -> {newsbi.name}')
+                        else:
+                            newrom = rom.with_name(new_name)
+                            rom.rename(newrom)
+                            ok(f'{rom.name} -> {newrom.name}')
+                            
+                            #It's a user error for patches of different type and same number to exist.
+                            softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
                             if len(softpatches)>1:
                                 warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
-                            for softpatch in softpatches:
-                                newrom = newrom.with_suffix(softpatch.suffix)
-                                next1.rename(newrom)
-                                log(f'{softpatch.name} -> {newrom.name}')
-                finally:
-                    #reneable keyboard kills
-                    if previous_signal:
-                        signal.signal(signal.SIGINT, previous_signal)
-        except PatchingError as e:
-            error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
-            error(f' file: {rom.name}')
-            error(f' path: {rom.parent.as_uri()}')
-            continue
-        except KeyError as e:
-            continue #not a rom
+                            #custom hardpatch removal xdelta, subchannel data, palette nes emulator file
+                            others = [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.sbi'), rom.with_suffix('.pal') ] if r.exists() ]
+                            for p in chain(softpatches,others):
+                                newrom = newrom.with_suffix(p.suffix)
+                                p.rename(newrom)
+                                log(f'{p.name} -> {newrom.name}')
+                            #support for retroarch consecutive softpatches (not xdelta which isn't a softpatch format),
+                            #until the number does not match.
+                            for x in range(1, 100):
+                                softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
+                                if not softpatches:
+                                    break
+                                if len(softpatches)>1:
+                                    warn(f'warning: more than one softpatch format exists for this rom {softpatches}')
+                                for softpatch in softpatches:
+                                    newrom = newrom.with_suffix(softpatch.suffix)
+                                    next1.rename(newrom)
+                                    log(f'{softpatch.name} -> {newrom.name}')
+                    finally:
+                        #reneable keyboard kills
+                        if previous_signal:
+                            signal.signal(signal.SIGINT, previous_signal)
+            except PatchingError as e:
+                error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
+                error(f' file: {rom.as_posix() if verbose else rom.name}')
+                error(f' path: {rom.parent.as_uri()}')
+                continue
+            except KeyError as e:
+                continue #not a rom
 
 def is_rhdn_translation(url_str):
     return 'www.romhacking.net/translations' in url_str
