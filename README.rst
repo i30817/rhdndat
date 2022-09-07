@@ -54,7 +54,7 @@ rhdndat-rn [OPTIONS] ROMDIR XMLPATH
                         rvz]
   --force               Force a recalculation and store of checksum
                         (in unix, on windows the calculation always happens).
-  --no-rename           Check dat only, never ask for rename.
+  --no-rename           Cache checksum and check dat only, never ask for rename.
   --verbose             Print full paths of skipped undatted/incomplete roms.
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or

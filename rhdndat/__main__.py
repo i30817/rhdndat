@@ -157,7 +157,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directories to skip, can be used multiple times.'),
             ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.'),
             force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
-            norename: bool = typer.Option(False, '--no-rename', help='Check dat only, never ask for rename.'),
+            norename: bool = typer.Option(False, '--no-rename', help='Cache checksum and check dat only, never ask for rename.'),
             verbose: bool = typer.Option(False, '--verbose', help='Print full paths of skipped undatted/incomplete roms.')
             ):
     """
