@@ -241,6 +241,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         for rom in files:
             #skip any already processed track file
             if rom in savedtracks:
+                savedtracks.remove(rom)
                 continue
             try:
                 #check if needs to skip bytes
@@ -262,18 +263,16 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         return Path(rom.parent, tmp).resolve()
                     tracks = list(map( track_constructor, re.findall('"(.*)"', index_txt)))
                 #if using a cue as indirection, remove pointed tracks from the check, and check if they exist before progressing
-                errors = 0
+                errors = False
                 for f in tracks:
-                    if f in savedtracks:
-                        error('error: track was checked before index that uses it, may use absolute or relative-up paths')
-                        errors += 1
-                        break
-                    if not f.is_file():
-                        error('error: missing track')
-                        errors += 1
-                        break
+                    if not errors and f in savedtracks:
+                        error('error: track was checked before index that uses it, may be caused by multiple index files pointing to it')
+                        errors = True
+                    if not errors and not f.is_file():
+                        error('error: missing track, may be caused by absolute or relative-up paths in the index file making a rename possible before processing it')
+                        errors = True
                     savedtracks.add(f)
-                if errors > 0:
+                if errors:
                     error(f'error: please fix the {index_file.as_uri() if verbose else index_file.name} track(s)')
                     continue
                 if not tracks: #share the next loop
@@ -331,13 +330,13 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     #find the games where all 'roms' checked are represented
                     #for instance, we do not want to add games that share a music track like tombraider 1 and 2
                     if not checksum or checksum not in combined_dict:
-                        errors = 1
+                        errors = True
                         break
                     if not games:
                         games = set(combined_dict[checksum])
                     else:
                         games = games.intersection(combined_dict[checksum])
-                if errors > 0 or not games:
+                if errors or not games:
                     warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
                     continue
                 if norename:

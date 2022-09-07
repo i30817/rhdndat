@@ -52,9 +52,9 @@ rhdndat-rn [OPTIONS] ROMDIR XMLPATH
                         n64, v64, z64, 3ds, nds, nes, lnx, fds, sfc, smc, bs, nsp,
                         32x, gg, sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi,
                         rvz]
-  --no-rename           Check dat only, never ask for rename.
-  --force               This option forces a recalculation and store of checksum
+  --force               Force a recalculation and store of checksum
                         (in unix, on windows the calculation always happens).
+  --no-rename           Check dat only, never ask for rename.
   --verbose             Print full paths of skipped undatted/incomplete roms.
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
