@@ -388,7 +388,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 custom_style = Style([
                     ('answer', 'fg:green bold'),
                 ])
-                choice = questionary.select(f'rename {rom.name} ?', possibilities, style=custom_style, qmark='', default=possibilities[0]).ask()
+                choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?', possibilities, style=custom_style, qmark='', default=possibilities[0]).ask()
                 if choice == None: #user ctrl+c
                     raise typer.Exit(code=1)
                 if choice != 'no':
