@@ -51,7 +51,7 @@ rhdndat-rn [OPTIONS] ROMDIR XMLPATH
                         [default: a78, hdi, fdi, ngc, ws, wsc, pce, gb, gba, gbc,
                         n64, v64, z64, 3ds, nds, nes, lnx, fds, sfc, smc, bs, nsp,
                         32x, gg, sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi,
-                        rvz]
+                        toc, rvz]
   --force               Force a recalculation and store of checksum
                         (in unix, on windows the calculation always happens).
   --no-rename           Cache checksum and check dat only, never ask for rename.
