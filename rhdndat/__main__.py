@@ -257,7 +257,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         index_txt = fcue.read()
                     index_file = rom
                     #instead of considering just the 'rom' file, consider also all file referenced inside cue or gdi or toc
-                    #since toc and cue can have a single 'file' but multiple 'tracks' the files this needs a ordered set
+                    #since toc and cue can have a single 'file' but multiple 'tracks' this needs a ordered set
                     if rom.suffix == '.gdi':
                         regex = '"(.*)"'
                     else:
