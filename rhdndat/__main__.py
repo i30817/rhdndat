@@ -490,7 +490,6 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
             possibilities = [questionary.Choice('no')]
-            rename_to_self = False
             for x in games:
                 def find_candidate_names(n):
                     #lower is just to be safe, i doubt that there are many dat files with uppercase extensions
@@ -510,34 +509,29 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 for name in names_to_show:
                     question = [('fg:green bold',name)]
                     disable = False
-                    if not tracks_need_renaming and Path(rom.parent, name).exists():
-                        question.append(('fg:grey bold',' (disabled, same name)' if rom.name == name else ' (disabled, destination exists)'))
-                        disable = True
-                        if not rename_to_self:
-                            rename_to_self = rom.name == name
+                    #don't ask to rename the rom itself to itself and fail later, that's just embarassing
+                    if rom != Path(rom.parent, name):
+                        if Path(rom.parent, name).exists():
+                            question.append(('fg:grey bold',' (disabled, destination exists)'))
+                            disable = True
+                        possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
                     elif tracks_need_renaming:
                         question.append(('fg:red bold',' (enabled, tracks need rename)'))
-                    possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
-            
-            assert len(possibilities) > 1, 'there should be at least one game added to the list'
-                      
-            custom_style = Style([
-                ('answer', 'fg:green bold'),
-            ])
-            all_disabled = f'verbose: {rom} (disable rename, all possible names already exist)'
-
+                        possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
+            #the only game that could be added was itself,
+            #without even any track renames to be done, skip
+            if len(possibilities) == 1:
+                continue
+            elif all((x.disabled for x in possibilities[1:])):
+                if verbose:
+                    log(f'verbose: {rom} (disable rename, all possible names already exist)')
+                continue
             choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
                                         possibilities,
-                                        style=custom_style,
-                                        qmark='?',
-                                        default=possibilities[0]).skip_if(all((x.disabled for x in possibilities[1:])), default=all_disabled).ask()
+                                        style=Style([('answer', 'fg:green bold')]),
+                                        default=possibilities[0]).ask()
             if choice == None: #user ctrl+c
                 raise typer.Exit(code=1)
-            if choice == all_disabled:
-                #don't print out that the program wanted to rename the rom itself to itself and failed, that's just embarassing
-                if verbose and (not rename_to_self or len(possibilities) > 2):
-                    log(choice)
-                continue
             if choice != 'no':
                 #ignore keyboard signal to not fuck up the renames of cues if using it
                 #(waits until it's out of the critical section, if you keep pressed)
