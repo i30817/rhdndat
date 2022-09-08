@@ -151,6 +151,13 @@ def getChecksumDict(xmls_list):
 
 def check_or_write(new_name, rom, index_txt, files, game):
     ''' This will either check that any file that will be renamed will not overwrite a existing file then rename
+    
+        files considered for renaming are all of the rom types, sbi plus:
+        for index roms (cue/toc/gdi): all the track files, all rxdelta for track files (not index_files); this also rewrites the index file tracks
+        for non-index roms: rxdelta, pal, ips, ups, bps files (and the numeric extensions for those last 3)
+        
+        Do not attempt to rename m3u files because they can and often do have different names than the original roms.
+        Use instead a recreation script after renaming, like my own create_m3u : https://gist.github.com/i30817/ba37fbb2b3c6e34ff926ad833f465055
     '''
     rename_error = False
     other_error = False
