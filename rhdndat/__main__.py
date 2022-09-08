@@ -7,6 +7,7 @@ import subprocess
 import urllib
 import shutil
 import tempfile
+import mimetypes
 from urllib.parse import urlparse
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -85,6 +86,18 @@ def get_sha1(skip):
 
     yield hash_sha1.hexdigest()
 
+def link(uri, label=None, parameters=None):
+    '''
+    Found in github, windows console and many unix consoles trick to embeed hyperlinks/uri with text
+    '''
+    if label is None:
+        label = uri
+    if parameters is None:
+        parameters = ''
+    # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
+    escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
+    return escape_mask.format(parameters, uri, label)
+
 def file_producer(source_filename, generator_function):
     next(generator_function)
     with open(source_filename, 'rb') as f:
@@ -142,15 +155,15 @@ def store(x, sha1):
 def getChecksumDict(xmls_list):
     def dictsetsum(dict1, game_tuple):
         game, origin = game_tuple
-        #game['origin'] = origin #currently not needed unless you want to display the dat origin, which is ugly
+        game['origin'] = origin
         for r in game.find_all('rom'):
             dict1[r.get('sha1')].append(game)
         return dict1
-    lazy_sequence = ( (x,y.name) for y in xmls_list for x in BeautifulSoup(open(y), features="xml").find_all('game'))
+    lazy_sequence = ( (x,y) for y in xmls_list for x in BeautifulSoup(open(y), features="xml").find_all('game'))
     return reduce(dictsetsum, lazy_sequence, defaultdict(list))
 
-def check_or_write(new_name, rom, index_txt, files, game, verbose):
-    ''' This will either check that any file that will be renamed will not overwrite a existing file then rename
+def check_or_write(new_name, rom, index_txt, files, game):
+    ''' This will check that any file that will be renamed will not overwrite a existing file then rename
     
         files considered for renaming are all of the rom types, sbi plus:
         for index roms (cue/toc/gdi): all the track files, all rxdelta for track files (not index_files); this also rewrites the index file tracks
@@ -165,8 +178,8 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
         nonlocal rename_error
         if not rename_error:
             rename_error = True
-            error('error: rename would overwrite:')
-        error(' ' + (file.as_posix() if verbose else file.name))
+            error(f'error: rom rename would overwrite files in directory {link(file.parent.as_uri(),"(open dir)")}')
+        error(f' {file.name}')
     
     main_files = [ r for r in [ rom, rom.with_suffix('.sbi') ] if r.exists() ]
     newrom = rom.with_name(new_name)
@@ -179,11 +192,10 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
         suffix    = Path(first.get('name')).suffix.lower()
         #but check the assumption.
         if not (suffix == '.cue' or suffix == '.gdi' or suffix == '.toc'):
-            error(f'error: {rom.name} did not expect game rom first entry in dat file not to be cue/toc/gdi:')
-            error(f' {first.get("name")}')
+            error(f'error: chosen game first entry is not the right extension {link(rom.as_uri(),"(open cue/toc/gdi)")} {link(game["origin"],"(open datfile)")}')
             other_error = True
         if len(files) != len(roms_json):
-            error(f'error: {rom.name} has a different number of tracks than the chosen game')
+            error(f'error: chosen game has a different number of tracks ({len(roms_json)}) than the rom ({len(files)}) {link(rom.as_uri(),"(open cue/toc/gdi)")} {link(game["origin"],"(open datfile)")}')
             other_error = True
         #don't cascade useless errors if the above happens
         if not other_error:
@@ -213,8 +225,7 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
         softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
         
         if len(softpatches)>1:
-            warn('warn: more than one active softpatch format exists for this rom:')
-            warn(f' {softpatches}')
+            warn(f'warn: more than one active softpatch format exists for this rom {link(rom.parent.as_uri(),"(open dir)")}')
         for r in chain(main_files, softpatches):
             new = newrom.with_suffix(r.suffix)
             if r != new:
@@ -230,8 +241,7 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
             if not softpatches:
                 break
             if len(softpatches)>1:
-                warn('warn: more than one active softpatch format exists for this rom:')
-                warn(f' {softpatches}')
+                warn(f'warn: more than one active softpatch format exists for this rom {link(rom.parent.as_uri(),"(open dir)")}')
             for softpatch in softpatches:
                 new = newrom.with_suffix(softpatch.suffix)
                 if softpatch != new:
@@ -250,9 +260,9 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
         #this way it should't matter if the original
         #was absolute or relative in the cue.
         index_txt = index_txt.replace(old_track.name, new_track.name)
-    if torename_tracks:
-        #this is the cue/gdi/toc file that will have to be moved
-        #(if it isn't, it's because it doesn't need it, so this still works)
+    if index_txt:
+        #this is the cue/toc/gdi, guarded by the existence of index text,
+        #that only exists when it's those. Edit it before possible renames.
         rom.write_text(index_txt, encoding='utf-8')
     for old_main, new_main in torename_main:
         old_main.rename(new_main)
@@ -263,10 +273,10 @@ def check_or_write(new_name, rom, index_txt, files, game, verbose):
 #it shouldn't be possible to end up with illegal characters on windows though, unless i'm missing something.
 def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             xmlpath: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=True, readable=True, resolve_path=True, help='Xml dat file or directory to search for xml dat files to use as source of new names.'),
-            skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directories to skip, can be used multiple times.'),
-            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.'),
-            force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
-            norename: bool = typer.Option(False, '--no-rename', help='Cache checksum and check dat only, never ask for rename.'),
+            skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to skip, can be repeated.'),
+            ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='ROM extensions to find names of, can be repeated. Note that you can ommit this argument to get the predefined list.'),
+            force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (on windows the calculation always happens).'),
+            norename: bool = typer.Option(False, '--no-rename', help='Check and store checksums only.'),
             verbose: bool = typer.Option(False, '--verbose', help='Print more information about skipped roms.')
             ):
     """
@@ -278,7 +288,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the rom filename is not equal to the dat name proposed. It will skip the question if all the names proposed already exist in the rom directory, and not allow a rename to a name that is existing file in the rom directory.
 
-    Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.gdi/.toc/tracks (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
+    Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.toc/.gdi (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
     
     'nes fds lnx a78' roms require headers and are hardcoded to ignore headers when calculating 'user.rhdndat.rom_sha1' to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
 
@@ -327,10 +337,10 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     elif xmlpath.is_dir():
         xmls = xmlpath.glob('**/*.dat')
     if not xmls:
-        error(f'Can\'t find xml dats in second argument.')
+        error('Can\'t find xml dats in second argument')
         raise typer.Abort()
     if romdir in skip or any( (excluded in skip for excluded in romdir.parents) ):
-        error('Can\'t process any roms because ROMDIR argument is in one of the skipped directories.')
+        error('Can\'t process any roms because ROMDIR argument is in one of the skipped directories')
         raise typer.Abort()
 
     combined_dict = getChecksumDict(xmls)
@@ -349,20 +359,25 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
         for rom in dirfiles:
             #skip any already processed track file
             if rom in savedtracks:
-                savedtracks.remove(rom)
                 continue
-
+            #limit error spam
+            errors = False
             #always lowercase extensions even if the current file has a different case
             suffix = rom.suffix.lower()
-            
             #check if needs to skip bytes
             skipped = headers.get(suffix) or 0
             #cues/gdi are handled especially to not have to bother confirming changing dozens of files (xattr are stored on track files)
             files = []
             index_txt = None
             if suffix == '.cue' or suffix == '.gdi' or suffix == '.toc':
-                with open(rom, 'r') as fcue:
-                    index_txt = fcue.read()
+                links = f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}'
+                try:
+                    with open(rom, 'tr') as fcue:
+                        index_txt = fcue.read()
+                        if not index_txt: raise Exception()
+                except:
+                    error(f'error: file doesn\'t appear to be a text file {links}')
+                    continue
                 #instead of considering just the 'rom' file, consider also all file referenced inside cue or gdi or toc
                 #since toc and cue can have a single 'file' but multiple 'tracks' this needs a ordered set
                 if rom.suffix == '.gdi':
@@ -375,19 +390,20 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         return tmp.resolve()
                     return Path(rom.parent, tmp).resolve()
                 files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
-            errors = False
-            for f in files:
-                #if for instance, you have the redump dreamcast set and put in the cues and the gdi in the same directories
-                if not errors and f in savedtracks:
-                    error('error: track was checked before index that uses it, may be caused by multiple index files pointing to it')
-                    errors = True
-                if not errors and not f.is_file():
-                    error('error: missing track, may be caused by absolute or relative-up paths in the index file making a rename possible before processing it')
-                    errors = True
-                savedtracks.add(f)
-            if errors:
-                error(f'error: please fix the {rom.name} track(s)')
-                continue
+                #set so that files that repeat the same filename don't show errors right away (make sure order does not matter in this loop)
+                for f in set(files):
+                    if not errors:
+                        if f in savedtracks:
+                            errors = True
+                            #if for instance, you have the redump dreamcast set and put in the cues and the gdi in the same directories
+                            error(f'error: track(s) were checked before, may be caused by multiple files using them {links}')
+                        if not f.is_file():
+                            errors = True
+                            #can happen if 'multiple index files' happened and the user renamed but not only
+                            error(f'error: missing track(s), may be caused by corrupt file, or previous rename {links}')
+                    savedtracks.add(f)
+                if errors:
+                    continue
             
             if not files: #share the next loop
                 files = [ rom ]
@@ -454,12 +470,10 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     else:
                         games = games.intersection(combined_dict[checksum])
             except PatchingError as e:
-                error(f'error: possible corruption or replacement of rom file without recreating rxdelta')
-                error(f' file: {rom.name}')
-                error(f' path: {rom.parent.as_uri()}')
+                error(f'error: rxdelta patch failed, may be caused by base rom replacement {link(rom.parent.as_uri(),"(open dir)")}')
                 continue
             if errors or not games:
-                warn(f'incomplete/undatted: {rom.as_posix() if verbose else rom.name}')
+                warn(f'incomplete/undatted: {link(rom.parent.as_uri(),rom.name + " (open dir)")} has no match in dats {link(xmlpath.as_uri(),"(open)")}')
                 continue
             if norename:
                 continue
@@ -468,7 +482,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             games = list(games)
             
             
-            #Jargon: chd/rvz are 'container' files, cue/gdi/toc are 'index' files.
+            #Jargon: chd/rvz are 'container' files, cue/toc/gdi are 'index' files.
             #'games' are dat entries where all the roms searched matched.
             #Neither container or index files are checked for being part of games.
             #Container files for obvious reasons, and index files to allow different
@@ -521,10 +535,12 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #the only game that could be added was itself,
             #without even any track renames to be done, skip
             if len(possibilities) == 1:
+                if verbose:
+                    log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} appears to have the correct name')
                 continue
             elif all((x.disabled for x in possibilities[1:])):
                 if verbose:
-                    log(f'verbose: {rom} (disable rename, all possible names already exist)')
+                    log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} any possible name already exists in the dir')
                 continue
             choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
                                         possibilities,
@@ -535,12 +551,10 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             if choice != 'no':
                 #ignore keyboard signal to not fuck up the renames of cues if using it
                 #(waits until it's out of the critical section, if you keep pressed)
-                def handler(signum, frame):
-                    log('CTRL-C ignored while renaming files')
-                previous_signal = signal.signal(signal.SIGINT,handler)
+                previous_signal = signal.signal(signal.SIGINT, signal.SIG_IGN)
                 try:
                     new_name, game = choice
-                    check_or_write(new_name, rom, index_txt, files, game, verbose)
+                    check_or_write(new_name, rom, index_txt, files, game)
                 finally:
                     #reneable keyboard kills
                     if previous_signal:
@@ -601,11 +615,7 @@ def get_romhacking_data(possible_metadata):
             tmp  = info.find('th', string='Language')
             tmp  = tmp and tmp.nextSibling.string
             if tmp and language and tmp != language:
-                warn(f'warn: {language}->{tmp} : language should not have changed twice with patches from romhacking.net')
-                p = Path(os.path.dirname(possible_metadata)).as_uri()
-                f = Path(possible_metadata).as_uri()
-                warn(f' path:  {p}')
-                warn(f' file:  {f}')
+                warn(f'warn: {language}->{tmp} : language should not have changed twice with patches from romhacking.net {link(possible_metadata.parent.as_uri(),"(open dir)")}')
             if tmp:
                 language = tmp
 
@@ -630,16 +640,14 @@ def get_romhacking_data(possible_metadata):
                 raise VersionFileURLError(possible_metadata, url)
 
             if remote_version != version:
-                warn(f'warn: local \'{version}\' != upstream \'{remote_version}\' versions')
-                warn(f' patch: {url}')
-                warn(f' path:  {possible_metadata.parent.as_uri()}')
+                warn(f'warn: local \'{version}\' {link(possible_metadata.parent.as_uri(),"(open dir)")} != remote \'{remote_version}\' {link(url, "(open url)")} versions')
         except (URLError, AttributeError) as e:
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
 
 
 def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for versions to check.'),
-    quiet: bool = typer.Option(False, '--quiet', help='Don\'t show the directory of the each checked rhdndat.ver file.')
+    show: bool = typer.Option(False, '--show', help='Show link to each checked directory.')
     ):
     """
     romhacking.net update checker
@@ -656,23 +664,18 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
     versions = romdir.glob("**/rhdndat.ver")
     try:
         for possible_metadata in versions:
-            if not quiet:
-                log(f'check: {possible_metadata.parent}') 
+            if show:
+                log(f'check: {link(possible_metadata.parent.as_uri(),possible_metadata.parent.name + " (open dir)")}') 
             try:
                 get_romhacking_data(possible_metadata)
             except RHDNTRomRemovedError as e:
-                warn(f'skip: romhacking.net deleted patch, check reason and delete last version from dat if bad')
-                warn(f' patch: {e.url}')
-                warn(f' path:  {e.versionfile.parent.as_uri()}')
+                error(f'error: romhacking.net deleted the patch {link(e.url, "(open url)")} check reason and consider deletion {link(e.versionfile.parent.as_uri(),"(open dir)")}')
     #fatal errors
     except VersionFileURLError as e:
-        error(f'error: version file url connection failure')
-        error(f' file: {Path(e.versionfile).as_uri()}')
-        error(f' url:  {e.url}')
+        error(f'error: rhdndat.ver file {link(e.versionfile.as_uri(), "(open file)")} had a connection failure {link(e.url, "(open url)")}')
         raise typer.Abort()
     except VersionFileSyntaxError as e:
-        error(f'error: version files repeat two lines, a version string and a romhacking url')
-        error(f' file: {Path(e.versionfile).as_uri()}')
+        error(f'error: rhdndat.ver files should repeat two lines, a version string and a romhacking url {link(e.versionfile.as_uri(), "(open file)")}')
         raise typer.Abort()
 
 def rename():

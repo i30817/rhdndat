@@ -14,7 +14,7 @@ To find the checksum of the original file for hardpatched roms, rhdndat-rn can s
 
 rhdndat-rn will read a xml dat file or every dat file from a directory given, and ask for renaming for every match where the rom filename is not equal to the dat name proposed. It will skip the question if all the names proposed already exist in the rom directory, and not allow a rename to a name that is existing file in the rom directory.
 
-Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.gdi/.toc/tracks (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
+Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.toc/.gdi (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
 
 ``nes fds lnx a78`` roms require headers and are hardcoded to ignore headers when calculating ``user.rhdndat.rom_sha1`` to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead to change the patch to target the no-header rom.
 
@@ -33,6 +33,7 @@ To rename files if you have the dat files:
 rhdndat [OPTIONS] ROMDIR
   :ROMDIR:  Directory to search for versions to check.  [required]
 
+  --show                Show link to each checked directory.
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
                         customize the installation.
@@ -44,17 +45,18 @@ rhdndat-rn [OPTIONS] ROMDIR XMLPATH
   
   :XMLPATH: Xml dat file or directory to search for xml dat files to use as source of new names.  [required]
 
-  --skip DIRECTORY      Directories to skip, can be used multiple times.
-  --ext TEXT            Lowercase ROM extensions to find names of. This option can
-                        be passed more than once (once per extension). Note that
-                        you can ommit this argument to get the predefined list.
-                        [default: a78, hdi, fdi, ngc, ws, wsc, pce, gb, gba, gbc,
-                        n64, v64, z64, 3ds, nds, nes, lnx, fds, sfc, smc, bs, nsp,
-                        32x, gg, sms, md, iso, dim, adf, ipf, dsi, wad, cue, gdi,
+  --skip DIRECTORY      Directory to skip, can be repeated.
+  --ext TEXT            ROM extensions to find names of, can be
+                        repeated. Note that you can ommit this
+                        argument to get the predefined list.
+                        [default: a78, hdi, fdi, ngc, ws, wsc, pce,
+                        gb, gba, gbc, n64, v64, z64, 3ds, nds, nes,
+                        lnx, fds, sfc, smc, bs, nsp, 32x, gg, sms,
+                        md, iso, dim, adf, ipf, dsi, wad, cue, gdi,
                         toc, rvz]
   --force               Force a recalculation and store of checksum
-                        (in unix, on windows the calculation always happens).
-  --no-rename           Cache checksum and check dat only, never ask for rename.
+                        (on windows the calculation always happens).
+  --no-rename           Check and store checksums only.
   --verbose             Print more information about skipped roms.
   --install-completion  Install completion for the current shell.
   --show-completion     Show completion for the current shell, to copy it or
