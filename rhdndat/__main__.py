@@ -149,7 +149,7 @@ def getChecksumDict(xmls_list):
     lazy_sequence = ( (x,y.name) for y in xmls_list for x in BeautifulSoup(open(y), features="xml").find_all('game'))
     return reduce(dictsetsum, lazy_sequence, defaultdict(list))
 
-def check_or_write(new_name, rom, index_txt, files, game):
+def check_or_write(new_name, rom, index_txt, files, game, verbose):
     ''' This will either check that any file that will be renamed will not overwrite a existing file then rename
     
         files considered for renaming are all of the rom types, sbi plus:
@@ -165,8 +165,8 @@ def check_or_write(new_name, rom, index_txt, files, game):
         nonlocal rename_error
         if not rename_error:
             rename_error = True
-            error(f'error: {rom.name} -> {new_name} would overwrite:')
-        error(' ' + str(file))
+            error('error: rename would overwrite:')
+        error(' ' + (file.as_posix() if verbose else file.name))
     
     main_files = [ r for r in [ rom, rom.with_suffix('.sbi') ] if r.exists() ]
     newrom = rom.with_name(new_name)
@@ -180,38 +180,41 @@ def check_or_write(new_name, rom, index_txt, files, game):
         #but check the assumption.
         if not (suffix == '.cue' or suffix == '.gdi' or suffix == '.toc'):
             error(f'error: {rom.name} did not expect game rom first entry in dat file not to be cue/toc/gdi:')
-            error(f' {first}')
+            error(f' {first.get("name")}')
             other_error = True
         if len(files) != len(roms_json):
             error(f'error: {rom.name} has a different number of tracks than the chosen game')
             other_error = True
-        #check the main files
-        for r in main_files:
-            new = newrom.with_suffix(r.suffix)
-            if r != new:
-                if new.exists():
-                    print_err(new)
-                else:
-                    torename_main.append((r,new))
-        #check tracks
-        for oldtrc, r_json in zip(files, roms_json):
-            #oldtrc is absolute, so newtrc is too. Tracks do not use 'newrom' for the name but the dat entry
-            newtrc = oldtrc.with_name(r_json.get('name'))
-            other_files = [ r for r in [ oldtrc, oldtrc.with_suffix('.rxdelta') ] if r.exists() ]
-            
-            for r in other_files:
-                new = newtrc.with_suffix(r.suffix)
+        #don't cascade useless errors if the above happens
+        if not other_error:
+            #check the main files
+            for r in main_files:
+                new = newrom.with_suffix(r.suffix)
                 if r != new:
                     if new.exists():
                         print_err(new)
                     else:
-                        torename_tracks.append((r, new))
+                        torename_main.append((r,new))
+            #check tracks
+            for oldtrc, r_json in zip(files, roms_json):
+                #oldtrc is absolute, so newtrc is too. Tracks do not use 'newrom' for the name but the dat entry
+                newtrc = oldtrc.with_name(r_json.get('name'))
+                other_files = [ r for r in [ oldtrc, oldtrc.with_suffix('.rxdelta') ] if r.exists() ]
+                
+                for r in other_files:
+                    new = newtrc.with_suffix(r.suffix)
+                    if r != new:
+                        if new.exists():
+                            print_err(new)
+                        else:
+                            torename_tracks.append((r, new))
     else:
         main_files += [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.pal') ] if r.exists() ]
         softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
         
         if len(softpatches)>1:
-            warn(f'warn: more than one active softpatch format exists for this rom {softpatches}')
+            warn('warn: more than one active softpatch format exists for this rom:')
+            warn(f' {softpatches}')
         for r in chain(main_files, softpatches):
             new = newrom.with_suffix(r.suffix)
             if r != new:
@@ -227,7 +230,8 @@ def check_or_write(new_name, rom, index_txt, files, game):
             if not softpatches:
                 break
             if len(softpatches)>1:
-                warn(f'warn: more than one active softpatch format exists for this rom {softpatches}')
+                warn('warn: more than one active softpatch format exists for this rom:')
+                warn(f' {softpatches}')
             for softpatch in softpatches:
                 new = newrom.with_suffix(softpatch.suffix)
                 if softpatch != new:
@@ -263,7 +267,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='Lowercase ROM extensions to find names of. This option can be passed more than once (once per extension). Note that you can ommit this argument to get the predefined list.'),
             force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (in unix, on windows the calculation always happens).'),
             norename: bool = typer.Option(False, '--no-rename', help='Cache checksum and check dat only, never ask for rename.'),
-            verbose: bool = typer.Option(False, '--verbose', help='Print full paths of skipped undatted/incomplete roms.')
+            verbose: bool = typer.Option(False, '--verbose', help='Print more information about skipped roms.')
             ):
     """
     rom renamer
@@ -486,6 +490,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
             possibilities = [questionary.Choice('no')]
+            rename_to_self = False
             for x in games:
                 def find_candidate_names(n):
                     #lower is just to be safe, i doubt that there are many dat files with uppercase extensions
@@ -503,30 +508,45 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 if will_replace_extension:
                     names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
                 for name in names_to_show:
+                    question = [('fg:green bold',name)]
+                    disable = False
                     if not tracks_need_renaming and Path(rom.parent, name).exists():
-                        possibilities.append(questionary.Choice(name, value=(name,x), disabled='disabled, destination exists'))
-                    else:
-                        possibilities.append(questionary.Choice(name + ' (enabled, tracks need rename)' if tracks_need_renaming else '', value=(name,x)))
+                        question.append(('fg:grey bold',' (disabled, same name)' if rom.name == name else ' (disabled, destination exists)'))
+                        disable = True
+                        if not rename_to_self:
+                            rename_to_self = rom.name == name
+                    elif tracks_need_renaming:
+                        question.append(('fg:red bold',' (enabled, tracks need rename)'))
+                    possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
             
-            #if in the rom directory, all of the candidates (except no) already exist renaming is unnecessary (and dangerous)
-            if len(possibilities) == 1 or all((x.disabled for x in possibilities[1:] )):
-                continue
-            
+            assert len(possibilities) > 1, 'there should be at least one game added to the list'
+                      
             custom_style = Style([
                 ('answer', 'fg:green bold'),
             ])
-            choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name}', possibilities, style=custom_style, default=possibilities[0]).ask()
+            all_disabled = f'verbose: {rom} (disable rename, all possible names already exist)'
+
+            choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
+                                        possibilities,
+                                        style=custom_style,
+                                        qmark='?',
+                                        default=possibilities[0]).skip_if(all((x.disabled for x in possibilities[1:])), default=all_disabled).ask()
             if choice == None: #user ctrl+c
                 raise typer.Exit(code=1)
+            if choice == all_disabled:
+                #don't print out that the program wanted to rename the rom itself to itself and failed, that's just embarassing
+                if verbose and (not rename_to_self or len(possibilities) > 2):
+                    log(choice)
+                continue
             if choice != 'no':
-                #ignore keyboard signal to not fuck up the renames of cues if using it 
+                #ignore keyboard signal to not fuck up the renames of cues if using it
                 #(waits until it's out of the critical section, if you keep pressed)
                 def handler(signum, frame):
                     log('CTRL-C ignored while renaming files')
                 previous_signal = signal.signal(signal.SIGINT,handler)
                 try:
                     new_name, game = choice
-                    check_or_write(new_name, rom, index_txt, files, game)
+                    check_or_write(new_name, rom, index_txt, files, game, verbose)
                 finally:
                     #reneable keyboard kills
                     if previous_signal:
