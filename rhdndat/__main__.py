@@ -63,6 +63,10 @@ class VersionFileURLError(Exception):
         self.versionfile = versionfile
         self.url = url
 
+class InvalidGameError(Exception):
+    def __init__(self):
+        super().__init__()
+
 def which(executable):
     flips = shutil.which(executable)
     if not flips:
@@ -162,71 +166,54 @@ def getChecksumDict(xmls_list):
     lazy_sequence = ( (x,y) for y in xmls_list for x in BeautifulSoup(open(y), features="xml").find_all('game'))
     return reduce(dictsetsum, lazy_sequence, defaultdict(list))
 
-def check_or_write(new_name, rom, index_txt, files, game):
+def check_and_rename(new_name, rom, index_txt, files, game):
     ''' This will check that any file that will be renamed will not overwrite a existing file then rename
     
-        files considered for renaming are all of the rom types, sbi plus:
-        for index roms (cue/toc/gdi): all the track files, all rxdelta for track files (not index_files); this also rewrites the index file tracks
+        extra files considered for renaming for the roms: sbi +
+        for index roms (cue/toc/gdi): all the track files, all rxdelta for track files (not index_files)
         for non-index roms: rxdelta, pal, ips, ups, bps files (and the numeric extensions for those last 3)
         
         Do not attempt to rename m3u files because they can and often do have different names than the original roms.
         Use instead a recreation script after renaming, like my own create_m3u : https://gist.github.com/i30817/ba37fbb2b3c6e34ff926ad833f465055
     '''
     rename_error = False
-    other_error = False
     def print_err(file):
         nonlocal rename_error
         if not rename_error:
             rename_error = True
             error(f'error: rom rename would overwrite files in directory {link(file.parent.as_uri(),"(open dir)")}')
         error(f' {file.name}')
-    
-    main_files = [ r for r in [ rom, rom.with_suffix('.sbi') ] if r.exists() ]
-    newrom = rom.with_name(new_name)
+
     torename_tracks = []
     torename_main = []
-    #if it's a index file, it has index text
+    newrom = rom.with_name(new_name)
+    for old, new in ( (rom, newrom), (rom.with_suffix('.sbi'), newrom.with_suffix('.sbi')) ):
+        if old != new and old.exists():
+            if new.exists():
+                print_err(new)
+            else:
+                torename_main.append((old, new))
+    #if it has index text, it has tracks
     if index_txt:
-        roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
-        first     = roms_json.pop(0)
-        suffix    = Path(first.get('name')).suffix.lower()
-        #but check the assumption.
-        if not (suffix == '.cue' or suffix == '.gdi' or suffix == '.toc'):
-            error(f'error: chosen game first entry is not the right extension {link(rom.as_uri(),"(open cue/toc/gdi)")} {link(game["origin"],"(open datfile)")}')
-            other_error = True
-        if len(files) != len(roms_json):
-            error(f'error: chosen game has a different number of tracks ({len(roms_json)}) than the rom ({len(files)}) {link(rom.as_uri(),"(open cue/toc/gdi)")} {link(game["origin"],"(open datfile)")}')
-            other_error = True
-        #don't cascade useless errors if the above happens
-        if not other_error:
-            #check the main files
-            for r in main_files:
-                new = newrom.with_suffix(r.suffix)
-                if r != new:
+        roms_json = game.find_all('rom') #these invariants (first entry is indexfile) were already tested
+        roms_json.pop(0)                 #remove the cue/gdi/toc since it was renamed above
+        #check tracks
+        for oldtrc, r_json in zip(files, roms_json):
+            #oldtrc is absolute, so newtrc is too. Tracks do not use 'newrom' for the name but the dat entry
+            newtrc = oldtrc.with_name(r_json.get('name'))
+            for old, new in ( (oldtrc, newtrc), (oldtrc.with_suffix('.rxdelta'), newtrc.with_suffix('.rxdelta')) ):
+                if old != new and old.exists():
                     if new.exists():
                         print_err(new)
                     else:
-                        torename_main.append((r,new))
-            #check tracks
-            for oldtrc, r_json in zip(files, roms_json):
-                #oldtrc is absolute, so newtrc is too. Tracks do not use 'newrom' for the name but the dat entry
-                newtrc = oldtrc.with_name(r_json.get('name'))
-                other_files = [ r for r in [ oldtrc, oldtrc.with_suffix('.rxdelta') ] if r.exists() ]
-                
-                for r in other_files:
-                    new = newtrc.with_suffix(r.suffix)
-                    if r != new:
-                        if new.exists():
-                            print_err(new)
-                        else:
-                            torename_tracks.append((r, new))
+                        torename_tracks.append((old, new))
     else:
-        main_files += [ r for r in [ rom.with_suffix('.rxdelta'), rom.with_suffix('.pal') ] if r.exists() ]
-        softpatches = [ r for r in [ rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ] if r.exists() ]
-        
+        #uglier but allows me to check for a user error
+        softpatches = [ r for r in ( rom.with_suffix('.ips'), rom.with_suffix('.bps'), rom.with_suffix('.ups') ) if r.exists() ]
+        mainpatches = [ r for r in ( rom.with_suffix('.rxdelta'), rom.with_suffix('.pal') ) if r.exists() ]
         if len(softpatches)>1:
             warn(f'warn: more than one active softpatch format exists for this rom {link(rom.parent.as_uri(),"(open dir)")}')
-        for r in chain(main_files, softpatches):
+        for r in chain(mainpatches, softpatches):
             new = newrom.with_suffix(r.suffix)
             if r != new:
                 if new.exists():
@@ -237,7 +224,7 @@ def check_or_write(new_name, rom, index_txt, files, game):
         #(not xdelta which isn't a softpatch format)
         #until the numbered files do not exist.
         for x in range(1, 100):
-            softpatches = [ r for r in [ rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ] if r.exists() ]
+            softpatches = [ r for r in ( rom.with_suffix(f'.ips{x}'), rom.with_suffix(f'.bps{x}'), rom.with_suffix(f'.ups{x}') ) if r.exists() ]
             if not softpatches:
                 break
             if len(softpatches)>1:
@@ -249,8 +236,7 @@ def check_or_write(new_name, rom, index_txt, files, game):
                         print_err(new)
                     else:
                         torename_main.append((softpatch,new))
-    
-    if other_error or rename_error:
+    if rename_error:
         #don't change files if any error was posted, just move on
         return
     for old_track, new_track in torename_tracks:
@@ -267,6 +253,41 @@ def check_or_write(new_name, rom, index_txt, files, game):
     for old_main, new_main in torename_main:
         old_main.rename(new_main)
         ok(f'{old_main.name} -> {new_main.name}')
+
+def validate_dat_game(is_index_file, files, allowed_extensions, game):
+    '''returns (list[valid_rom_names], bool tracks_need_rename)
+    
+        throws error if first rom is not allowed extension for index files and it's a index file
+        throws error if number of tracks is different than expected number of tracks for index files
+        throws error if the number of roms with allowed extensions for non-index file doesn't match exactly the number of roms or is 0
+    '''
+    tracks_need_renaming = False
+    roms_with_extension = []
+    if is_index_file:
+        #use this strategy for validating implied order, check the first 'rom' is a index file
+        roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
+        first     = roms_json.pop(0)
+        name      = first.get('name')
+        if Path(name).suffix.lower() not in allowed_extensions:
+            error(f'error: matched game first entry is not a cue/toc/gdi (entry: {name}) {link(game["origin"],"(open datfile)")}')
+            raise InvalidGameError()
+        #the others are just tracks
+        if len(files) != len(roms_json):
+            error(f'error: matched game #tracks ({len(roms_json)}) != rom #tracks ({len(files)}) (game: {game["name"]}) {link(game["origin"],"(open datfile)")}')
+            raise InvalidGameError()
+        for t,r in zip(files, roms_json):
+            tracks_need_renaming = t.name != r['name']
+            if tracks_need_renaming:
+                break
+        roms_with_extension = [ first ]
+    else:
+        #for index games, it's implied that there is only one 'game' but for non index games there might be two isos in a cd game (not for redump but others)
+        #so a single rom of a allowed extension would be asked to be renamed 'in the next rom' but not if they're not on the allowed extensions.
+        roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in ext})
+        if not roms_with_extension or len(roms_with_extension) != len(game.find_all('rom')):
+            error(f'error: matched game without all valid extensions (game: {game["name"]}) {link(game["origin"],"(open datfile)")}')
+            raise InvalidGameError()
+    return (roms_with_extension, tracks_need_renaming)
 
 #this method might rename files.
 #since we use dats to get the possible new filenames from the 'rom name' entry
@@ -369,7 +390,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #cues/gdi are handled especially to not have to bother confirming changing dozens of files (xattr are stored on track files)
             files = []
             index_txt = None
-            if suffix == '.cue' or suffix == '.gdi' or suffix == '.toc':
+            if suffix in sortd:
                 links = f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}'
                 try:
                     with open(rom, 'tr') as fcue:
@@ -502,22 +523,15 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #In the case of index or container files, additionally replace the
             #extensions found by the current one.
             
-            will_replace_extension = suffix == '.cue' or suffix == '.gdi' or suffix == '.toc' or suffix == '.chd' or suffix == '.rvz'
+            will_replace_extension = suffix in sortd or suffix == '.chd' or suffix == '.rvz'
             possibilities = [questionary.Choice('no')]
             for x in games:
-                def find_candidate_names(n):
-                    #lower is just to be safe, i doubt that there are many dat files with uppercase extensions
-                    return Path(n).suffix.lower() in ext
-                
-                roms_with_extension = x.find_all('rom', attrs={"name": find_candidate_names})
-                #this depends on the order of the game dat entry being the same as the order of the index file
-                tracks_need_renaming = False
-                if index_txt:
-                    for t,r in zip(files, [ r for r in x.find_all('rom') if r not in roms_with_extension ]):
-                        tracks_need_renaming = t.name != r['name']
-                        if tracks_need_renaming:
-                            break
-                names_to_show = (y['name'] for y in roms_with_extension)
+                try:
+                    valid_roms, tracks_need_renaming = validate_dat_game(index_txt, files, sortd, x)
+                except InvalidGameError:
+                    errors = True
+                    continue
+                names_to_show = (y['name'] for y in valid_roms)
                 if will_replace_extension:
                     names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
                 for name in names_to_show:
@@ -532,14 +546,14 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     elif tracks_need_renaming:
                         question.append(('fg:red bold',' (enabled, tracks need rename)'))
                         possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
-            #the only game that could be added was itself,
+            #no game was added (or some were skipped),
             #without even any track renames to be done, skip
             if len(possibilities) == 1:
-                if verbose:
+                if verbose and not errors:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} appears to have the correct name')
                 continue
             elif all((x.disabled for x in possibilities[1:])):
-                if verbose:
+                if verbose and not errors:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} any possible name already exists in the dir')
                 continue
             choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
@@ -554,7 +568,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 previous_signal = signal.signal(signal.SIGINT, signal.SIG_IGN)
                 try:
                     new_name, game = choice
-                    check_or_write(new_name, rom, index_txt, files, game)
+                    check_and_rename(new_name, rom, index_txt, files, game)
                 finally:
                     #reneable keyboard kills
                     if previous_signal:
