@@ -390,14 +390,16 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             #cues/gdi are handled especially to not have to bother confirming changing dozens of files (xattr are stored on track files)
             files = []
             index_txt = None
+            #Checking if file is binary/text has lots of false positives if you don't want to read it all (and even some if you do),
+            #Some wonderswan roms are marked as 'ISO-8859 text, with very long lines (65536), with no line terminators' by unix file utility.
             if suffix in sortd:
-                links = f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}'
+                #for cue/gdi/toc we do want to read it all so can easily check
                 try:
-                    with open(rom, 'tr') as fcue:
-                        index_txt = fcue.read()
-                        if not index_txt: raise Exception()
+                    with open(rom, 'tr') as f:
+                        index_txt = f.read()
+                    if not index_txt: raise Exception()
                 except:
-                    error(f'error: file doesn\'t appear to be a text file {links}')
+                    error(f'error: cue/toc/gdi file is not text {link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                     continue
                 #instead of considering just the 'rom' file, consider also all file referenced inside cue or gdi or toc
                 #since toc and cue can have a single 'file' but multiple 'tracks' this needs a ordered set
@@ -417,11 +419,13 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         if f in savedtracks:
                             errors = True
                             #if for instance, you have the redump dreamcast set and put in the cues and the gdi in the same directories
-                            error(f'error: track(s) were checked before, may be caused by multiple files using them {links}')
+                            error('error: track(s) were checked before, may be caused by multiple files using them '
+                                  f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                         if not f.is_file():
                             errors = True
                             #can happen if 'multiple index files' happened and the user renamed but not only
-                            error(f'error: missing track(s), may be caused by corrupt file, or previous rename {links}')
+                            error('error: missing track(s), may be caused by corrupt file, or previous rename '
+                                  f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                     savedtracks.add(f)
                 if errors:
                     continue
