@@ -254,7 +254,7 @@ def check_and_rename(new_name, rom, index_txt, files, game):
         old_main.rename(new_main)
         ok(f'{old_main.name} -> {new_main.name}')
 
-def validate_dat_game(is_index_file, files, allowed_extensions, game):
+def validate_dat_game(is_index_file, files, allowed_index_extensions, allowed_extensions, game):
     '''returns (list[valid_rom_names], bool tracks_need_rename)
     
         throws error if first rom is not allowed extension for index files and it's a index file
@@ -268,7 +268,7 @@ def validate_dat_game(is_index_file, files, allowed_extensions, game):
         roms_json = game.find_all('rom') #ordered by track order, just like the cue parsing
         first     = roms_json.pop(0)
         name      = first.get('name')
-        if Path(name).suffix.lower() not in allowed_extensions:
+        if Path(name).suffix.lower() not in allowed_index_extensions:
             error(f'error: matched game first entry is not a cue/toc/gdi (entry: {name}) {link(game["origin"],"(open datfile)")}')
             raise InvalidGameError()
         #the others are just tracks
@@ -283,7 +283,7 @@ def validate_dat_game(is_index_file, files, allowed_extensions, game):
     else:
         #for index games, it's implied that there is only one 'game' but for non index games there might be two isos in a cd game (not for redump but others)
         #so a single rom of a allowed extension would be asked to be renamed 'in the next rom' but not if they're not on the allowed extensions.
-        roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in ext})
+        roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in allowed_extensions})
         if not roms_with_extension or len(roms_with_extension) != len(game.find_all('rom')):
             error(f'error: matched game without all valid extensions (game: {game["name"]}) {link(game["origin"],"(open datfile)")}')
             raise InvalidGameError()
@@ -525,35 +525,38 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             
             will_replace_extension = suffix in sortd or suffix == '.chd' or suffix == '.rvz'
             possibilities = [questionary.Choice('no')]
+            current_rom_was_in_dats = False
             for x in games:
                 try:
-                    valid_roms, tracks_need_renaming = validate_dat_game(index_txt, files, sortd, x)
+                    valid_roms, tracks_need_renaming = validate_dat_game(index_txt, files, sortd, ext, x)
                 except InvalidGameError:
-                    errors = True
                     continue
                 names_to_show = (y['name'] for y in valid_roms)
                 if will_replace_extension:
                     names_to_show = map( lambda n: Path(n).stem + suffix,  names_to_show)
                 for name in names_to_show:
                     question = [('fg:green bold',name)]
-                    disable = False
-                    #don't ask to rename the rom itself to itself and fail later, that's just embarassing
                     if rom != Path(rom.parent, name):
+                        disable = False
                         if Path(rom.parent, name).exists():
-                            question.append(('fg:grey bold',' (disabled, destination exists)'))
+                            question.append(('fg:grey bold',' (destination exists)'))
                             disable = True
                         possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
                     elif tracks_need_renaming:
-                        question.append(('fg:red bold',' (enabled, tracks need rename)'))
-                        possibilities.append(questionary.Choice(question, value=(name,x), disabled=disable))
-            #no game was added (or some were skipped),
+                        question.append(('fg:red bold',' (current rom, tracks need rename)'))
+                        possibilities.append(questionary.Choice(question, value=(name,x), disabled=False))
+                    else:#need to show that the current rom is valid otherwise user will think he 'has' to rename
+                        current_rom_was_in_dats = True
+                        question.append(('fg:grey bold',' (current rom)'))
+                        possibilities.append(questionary.Choice(question, value=(name,x), disabled=True))
+            #no game was added (or some were skipped because the dat was broken),
             #without even any track renames to be done, skip
             if len(possibilities) == 1:
-                if verbose and not errors:
+                if verbose and current_rom_was_in_dats:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} appears to have the correct name')
                 continue
             elif all((x.disabled for x in possibilities[1:])):
-                if verbose and not errors:
+                if verbose:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} any possible name already exists in the dir')
                 continue
             choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
