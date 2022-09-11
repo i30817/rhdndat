@@ -195,7 +195,7 @@ def check_and_rename(new_name, rom, index_txt, files, game):
                 torename_main.append((old, new))
     #if it has index text, it has tracks
     if index_txt:
-        roms_json = game.find_all('rom') #these invariants (first entry is indexfile) were already tested
+        roms_json = game.find_all('rom') #invariants were checked (first entry is indexfile and len(files) == len(roms_json))
         roms_json.pop(0)                 #remove the cue/gdi/toc since it was renamed above
         #check tracks
         for oldtrc, r_json in zip(files, roms_json):
