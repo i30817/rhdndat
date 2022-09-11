@@ -412,9 +412,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     if tmp.is_absolute():
                         return tmp.resolve()
                     return Path(rom.parent, tmp).resolve()
+                #although a toc or a cue can point to the same file for different tracks, dats will only have '1' unique file
                 files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
-                #set so that files that repeat the same filename don't show errors right away (make sure order does not matter in this loop)
-                for f in set(files):
+                for f in files:
                     if not errors:
                         if f in savedtracks:
                             errors = True
