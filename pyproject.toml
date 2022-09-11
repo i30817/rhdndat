@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rhdndat"
-version = "2.6.6"
+version = "2.6.7"
 description = "www.romhacking.net update checker"
 authors = ["i30817 <i30817@gmail.com>"]
 license = "GNU General Public License v3.0"
