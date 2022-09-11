@@ -555,12 +555,10 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         possibilities.append(questionary.Choice(question, value=(name,x), disabled=True))
             #no game was added (or some were skipped because the dat was broken),
             #without even any track renames to be done, skip
-            if len(possibilities) == 1:
+            if all((x.disabled for x in possibilities[1:])):
                 if verbose and current_rom_was_in_dats:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} appears to have the correct name')
-                continue
-            elif all((x.disabled for x in possibilities[1:])):
-                if verbose:
+                elif verbose:
                     log(f'log: {link(rom.parent.as_uri(),rom.name + " (open dir)")} any possible name already exists in the dir')
                 continue
             choice = questionary.select(f'rename {"(hack?) " if "(" not in rom.name else ""}{rom.name} ?',
