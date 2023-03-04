@@ -407,26 +407,30 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     regex = '"(.*)"'
                 else:
                     regex = 'FILE\s+"(.*)"'
+                class TrackAlreadyCheckedError(ValueError):
+                    '''already checked'''
                 def track_constructor(st):
                     tmp = Path(st)
-                    if tmp.is_absolute():
-                        return tmp.resolve()
-                    return Path(rom.parent, tmp).resolve()
+                    if not tmp.is_absolute():
+                        tmp = Path(rom.parent, tmp)
+                    tmp = tmp.resolve()
+                    if not tmp.is_file():
+                        raise ValueError('track must be a file')
+                    if tmp in savedtracks:
+                        raise TrackAlreadyCheckedError()
+                    savedtracks.add(tmp)
+                    return tmp
                 #although a toc or a cue can point to the same file for different tracks, dats will only have '1' unique file
-                files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
-                for f in files:
-                    if not errors:
-                        if f in savedtracks:
-                            errors = True
-                            #if for instance, you have the redump dreamcast set and put in the cues and the gdi in the same directories
-                            error('error: track(s) were checked before, may be caused by multiple files using them '
-                                  f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
-                        if not f.is_file():
-                            errors = True
-                            #can happen if 'multiple index files' happened and the user renamed but not only
-                            error('error: missing track(s), may be caused by corrupt file, or previous rename '
-                                  f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
-                    savedtracks.add(f)
+                try:
+                    files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
+                except TrackAlreadyCheckedError:
+                    errors = True
+                    error('error: track(s) were checked before, may be caused by multiple files using them '
+                          f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
+                except:
+                    errors = True
+                    error('error: missing track(s), may be caused by corrupt file, or previous rename '
+                          f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                 if errors:
                     continue
             
