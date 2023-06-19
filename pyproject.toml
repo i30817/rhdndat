@@ -14,7 +14,6 @@ questionary = "^1.10.0"
 typer = "^0.5.0"
 colorama = "^0.4.4"
 lxml = "^4.9.1"
-chd-rs-py = "^*"
 xattr = [
     { version = "^0.9.9", markers = "sys_platform != 'win32'" },
 ]
