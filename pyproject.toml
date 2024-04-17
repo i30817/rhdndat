@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rhdndat"
-version = "2.6.9"
+version = "2.7.0"
 description = "www.romhacking.net update checker"
 authors = ["i30817 <i30817@gmail.com>"]
 license = "GNU General Public License v3.0"
@@ -14,6 +14,7 @@ questionary = "^1.10.0"
 typer = "^0.9.0"
 colorama = "^0.4.4"
 lxml = "^4.9.1"
+requests = "^2.31.0"
 xattr = [
     { version = "^0.9.9", markers = "sys_platform != 'win32'" },
 ]

@@ -8,9 +8,7 @@ import urllib
 import shutil
 import tempfile
 import mimetypes
-from urllib.parse import urlparse
-from urllib.request import urlopen
-from urllib.error import URLError
+import requests
 from pathlib import Path
 from hashlib import sha1
 import re
@@ -90,14 +88,13 @@ def get_sha1(skip):
 
     yield hash_sha1.hexdigest()
 
-def link(uri, label=None, parameters=None):
+def link(uri, label=None, parameters=''):
     '''
     Found in github, windows console and many unix consoles trick to embeed hyperlinks/uri with text
+    https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
     '''
     if label is None:
         label = uri
-    if parameters is None:
-        parameters = ''
     # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
     escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
     return escape_mask.format(parameters, uri, label)
@@ -610,7 +607,7 @@ def read_version_file(possible_metadata):
         raise VersionFileSyntaxError(possible_metadata)
     return hacks_list
 
-def get_romhacking_data(possible_metadata):
+def get_romhacking_data(possible_metadata, session):
     ''' returns the tuple (metadata, language)
         metadata is a list of (title, authors_string, version, url) 1 for each hack
         language is the last language of the hacks
@@ -621,7 +618,8 @@ def get_romhacking_data(possible_metadata):
 
     for (version, url) in version_hacks:
         try:
-            page = urlopen(url).read()
+            response = session.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            page = response.text
             soup = BeautifulSoup(page, 'lxml')
 
             #removed hacks from romhacking.net can be bad news, broken or malicious hacks
@@ -652,7 +650,7 @@ def get_romhacking_data(possible_metadata):
                 authors_str += ' and {}'.format(authors[-1].string)
 
             metadata += [(
-                info.find('div').find('div').string, #main title
+                info.find('div').string, #main title
                 authors_str,
                 version, #the version we actually have
                 url
@@ -664,7 +662,7 @@ def get_romhacking_data(possible_metadata):
 
             if remote_version != version:
                 warn(f'warn: local \'{version}\' {link(possible_metadata.parent.as_uri(),"(open dir)")} != remote \'{remote_version}\' {link(url, "(open url)")} versions')
-        except (URLError, AttributeError) as e:
+        except (requests.exceptions.RequestException, AttributeError) as e:
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
 
@@ -686,11 +684,12 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
     
     versions = romdir.glob("**/rhdndat.ver")
     try:
+        session = requests.Session()
         for possible_metadata in versions:
             if show:
                 log(f'check: {link(possible_metadata.parent.as_uri(),possible_metadata.parent.name + " (open dir)")}') 
             try:
-                get_romhacking_data(possible_metadata)
+                get_romhacking_data(possible_metadata, session)
             except RHDNTRomRemovedError as e:
                 error(f'error: romhacking.net deleted the patch {link(e.url, "(open url)")} check reason and consider deletion {link(e.versionfile.parent.as_uri(),"(open dir)")}')
     #fatal errors
