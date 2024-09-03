@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ multibuild ]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: wheels
       - uses: actions/setup-python@v2
