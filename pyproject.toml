@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rhdndat"
-version = "2.7.2"
+version = "2.7.3"
 description = "www.romhacking.net update checker"
 authors = ["i30817 <i30817@gmail.com>"]
 license = "GNU General Public License v3.0"
@@ -10,7 +10,7 @@ repository = "https://github.com/i30817/rhdndat"
 [tool.poetry.dependencies]
 python = "^3.8"
 beautifulsoup4 = "^4.10.0"
-questionary = "^1.10.0"
+questionary = "^2.1.1"
 typer = "^0.19.0"
 colorama = "^0.4.4"
 lxml = "^4.9.1"
