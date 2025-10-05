@@ -335,7 +335,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     try:
         xattr = None
         import xattr
-        if "TERMUXVERSION" in os.environ:
+        if "TERMUX_VERSION" in os.environ:
             xattr = None
     except Exception as e:
         #windows and termux
