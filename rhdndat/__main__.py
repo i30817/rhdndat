@@ -335,9 +335,10 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     try:
         xattr = None
         import xattr
+        if "TERMUXVERSION" in os.environ:
+            xattr = None
     except Exception as e:
-        #windows will not be able to
-        #but hopefully only windows
+        #windows and termux
         pass
     try:
         xdelta = which('xdelta3')
