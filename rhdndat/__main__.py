@@ -291,7 +291,7 @@ def validate_dat_game(is_index_file, files, allowed_index_extensions, allowed_ex
 #it shouldn't be possible to end up with illegal characters on windows though, unless i'm missing something.
 def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to search for roms to rename.'),
             xmlpath: Path = typer.Argument(..., exists=True, file_okay=True, dir_okay=True, readable=True, resolve_path=True, help='Xml dat file or directory to search for xml dat files to use as source of new names.'),
-            skip: Optional[List[Path]] = typer.Option(None, exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to skip, can be repeated.'),
+            skip: Optional[List[Path]] = typer.Option([], exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True, help='Directory to skip, can be repeated.'),
             ext: Optional[List[str]] = typer.Option(['a78', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='ROM extensions to find names of, can be repeated. Note that you can ommit this argument to get the predefined list.'),
             force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (on windows the calculation always happens).'),
             norename: bool = typer.Option(False, '--no-rename', help='Check and store checksums only.'),
