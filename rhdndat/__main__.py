@@ -278,16 +278,13 @@ def validate_dat_game(is_index_file, files, allowed_index_extensions, allowed_ex
                 break
         roms_with_extension = [ first ]
     else:
-        #for non-index games, the cases where there is more than one ROM are forbidden,
-        #redump and no-intro don't obey this limit in the CDN dats, which you dont want
-        #for this and don't load in emulators anyway.
-        roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in allowed_extensions})
-        if 1 != len(game.find_all('rom')):
-            error(f'error: please dont use dats with multiple roms per game {link(game["origin"],"(open datfile)")}')
-            raise InvalidGameError()
-        #dat has ROM extensions not in the allowed extensions that matched
+        #for non-index games, the cases where there is more than one ROM are not forbidden
+        #but they are uniquified based on name and unknown extensions are filtered out
+        #(this is after the checksum was used, so finding the right ROM doesn't matter)
+        roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in allowed_extensions})   
         if not roms_with_extension:
-            warn(f'warn: unknown dat ROM extension .{Path(game.find("rom")["name"]).suffix.lower()} {link(game["origin"],"(open datfile)")}')
+            warn(f'warn: unknown dat ROM extension "{Path(game.find("rom")["name"]).suffix.lower()}" {link(game["origin"],"(open datfile)")}')
+        roms_with_extension = {g["name"] : g for g in roms_with_extension}.values()
     return (roms_with_extension, tracks_need_renaming)
 
 #this method might rename files.
