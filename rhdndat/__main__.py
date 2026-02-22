@@ -309,7 +309,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.toc/.gdi (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
     
-    'nes fds lnx a78' roms require headers and are hardcoded to ignore headers when calculating 'user.rhdndat.rom_sha1' to match the no-intro dat checksums that checksum everything except the header. This is problematic for hacks, where you can 'verify' a file is the right rom, but the hack was created for a rom with another header. A solution that keeps the softpatch is tracking down the right rom, hardpatching it, and creating a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
+    No-intro recently changed its mind and all roms checksums in its dats no longer skip headers (regardless if they carry a headered and unheadered dat). To softpatch mismatching headers hacks, you can track down the right rom, hardpatch it, and create a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
 
     Requires xdelta3⁴ (to process rxdelta) and dolphin-tool⁵ (to operate on rvz files) on path or the same directory.
     
@@ -365,7 +365,8 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     combined_dict = getChecksumDict(xmls)
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
-    headers = { '.nes' : 16, '.fds' : 16,  '.lnx' : 64, '.a78' : 128 }
+    #redump is no longer skipping headers in checksums.
+    headers = {}
     savedtracks = set() #saves track files to prevent them being processed twice
     sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
     for (root,dirs,dirfiles) in os.walk(romdir, topdown=True):
