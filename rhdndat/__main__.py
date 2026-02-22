@@ -354,7 +354,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     if xmlpath.is_file():
         xmls = [xmlpath]
     elif xmlpath.is_dir():
-        xmls = xmlpath.glob('**/*.dat')
+        xmls = list(xmlpath.glob('**/*.dat') + xmlpath.glob('**/*.xml'))
     if not xmls:
         error('Can\'t find xml dats in second argument')
         raise typer.Abort()
