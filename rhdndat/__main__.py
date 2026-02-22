@@ -283,11 +283,11 @@ def validate_dat_game(is_index_file, files, allowed_index_extensions, allowed_ex
         #for this and don't load in emulators anyway.
         roms_with_extension = game.find_all('rom', attrs={"name": lambda n: Path(n).suffix.lower() in allowed_extensions})
         if 1 != len(game.find_all('rom')):
-            error(f'error: please dont use dats with multiple non cd-track files {link(game["origin"],"(open datfile)")}')
+            error(f'error: please dont use dats with multiple roms per game {link(game["origin"],"(open datfile)")}')
             raise InvalidGameError()
         #dat has ROM extensions not in the allowed extensions that matched
         if not roms_with_extension:
-            warn(f'warn: unknown dat ROM extension .{game.find("rom").suffix.lower()} {link(game["origin"],"(open datfile)")}')
+            warn(f'warn: unknown dat ROM extension .{Path(game.find("rom")["name"]).suffix.lower()} {link(game["origin"],"(open datfile)")}')
     return (roms_with_extension, tracks_need_renaming)
 
 #this method might rename files.
