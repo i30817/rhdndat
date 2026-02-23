@@ -309,10 +309,11 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     Besides bare rom files, files affected by renames are compressed wii/gamecube .rvz files, .cue/.toc/.gdi (treated especially to not ask for every track), the softpatch types .ips, .bps, .ups, including the new retroarch multiple softpatch convention (a number after the softpatch extension), .rxdelta, .pal NES color palettes, and sbi subchannel data files.
     
-    No-intro recently changed its mind and all roms checksums in its dats no longer skip headers (regardless if they carry a headered and unheadered dat). To softpatch mismatching headers hacks, you can track down the right rom, hardpatch it, and create a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom.
-
-    Requires xdelta3⁴ (to process rxdelta) and dolphin-tool⁵ (to operate on rvz files) on path or the same directory.
+    No-intro recently changed its mind and all roms checksums in its dats no longer skip headers (regardless if they carry a headered and unheadered dat). To softpatch mismatching headers hacks, you can track down the right rom, hardpatch it, and create a softpatch from the current no-intro rom to the older patched rom. For sfc and pce ips hacks that target a headered rom I recommend ipsbehead³ to change the patch to target the no-header rom if possible.
     
+    When you update a no-intro set, all romhacks roms should not be also updated because otherwise the hacks stop working and yet users are encouraged go keep the same directory platforms roms in the same base directory, including hacks (for for example, have a single canonical retroarch playlist) which makes rhdndat-rn scans complain about the massive mismatching roms from older sets to the new set. I dont really encourage keeping a single combined hacks and nointro same directory set, but I do have a solution to make rhdndat-rn stop complaining: create a .rxdelta patch from each affected rom, to the new nointro rom.
+    
+    Requires xdelta3⁴ (to process rxdelta) and dolphin-tool⁵ (to operate on rvz files) on path or the same directory.    
     ¹ scroll down and click 'prepare' to get a collection of cartrige rom .DAT files
     
     https://datomatic.no-intro.org/index.php?page=download&s=64&op=daily
