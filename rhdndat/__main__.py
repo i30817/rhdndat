@@ -297,7 +297,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             ext: Optional[List[str]] = typer.Option(['a78', 'd64', 'crt', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'unh', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='ROM extensions to find names of, can be repeated. Note that you can ommit this argument to get the predefined list.'),
             force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (on windows the calculation always happens).'),
             norename: bool = typer.Option(False, '--no-rename', help='Check and store checksums only.'),
-            showhacks: bool = typer.Option(False, '--show-hacks', help='Show renames for files without parentheses (a good indicator for hacks, if you want to keep renames for translations anyway, keep the original name for them).')
+            showhacks: bool = typer.Option(False, '--show-hacks', help='Show renames for files without parentheses (a good indicator for hacks, if you want to keep renames for translations anyway, keep the original name for them).'),
             verbose: bool = typer.Option(False, '--verbose', help='Print more information about skipped roms.')
             ):
     """
