@@ -669,6 +669,11 @@ def get_romhacking_data(possible_metadata, session):
             if remote_version != version:
                 warn(f'warn: local \'{version}\' {link(possible_metadata.parent.as_uri(),"(open dir)")} != remote \'{remote_version}\' {link(url, "(open url)")} versions')
         except (requests.exceptions.RequestException, AttributeError) as e:
+            if response.status_code == 403:
+                error("error: blocked by cloudflare (403 Forbidden)")
+            elif response.status_code == 429:
+                error("error: rate limited by cloudflare (429 Too Many Requests)")
+                continue #have rate limiter not worth it to stop everythibg in this case
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
 
