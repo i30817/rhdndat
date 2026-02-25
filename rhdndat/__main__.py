@@ -89,12 +89,21 @@ def get_sha1(skip):
 
     yield hash_sha1.hexdigest()
 
+def hyperlinks_disabled():
+    # GNU standard: NO_TERM_HYPERLINKS (set to any value = disabled)
+    if os.getenv("NO_TERM_HYPERLINKS") is not None:
+        return True
+    # Chalk/CLI standard: FORCE_HYPERLINK=0
+    if os.getenv("FORCE_HYPERLINK") == "0":
+        return True
+    return False
+
 def link(uri, label=None, parameters=''):
     '''
     Found in github, windows console and many unix consoles trick to embeed hyperlinks/uri with text
     https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
     '''
-    if label is None:
+    if label is None or hyperlinks_disabled():
         label = uri
     # OSC 8 ; params ; URI ST <name> OSC 8 ;; ST
     escape_mask = '\033]8;{};{}\033\\{}\033]8;;\033\\'
