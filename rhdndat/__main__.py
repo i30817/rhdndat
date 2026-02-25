@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import mimetypes
 import requests
+from requests_ratelimiter import LimiterSession
 from pathlib import Path
 from hashlib import sha1
 import re
@@ -676,19 +677,19 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
     ):
     """
     romhacking.net update checker
-    
+
     rhdndat finds rhdndat.ver files to check for romhacking.net updates
 
     A version file is named rhdndat.ver and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
     To update this program to the latest release with pip installed, type:
-    
+
     pip install --force-reinstall rhdndat
     """
-    
+
     versions = romdir.glob("**/rhdndat.ver")
     try:
-        session = requests.Session()
+        session = LimiterSession(per_minute=20, burst=4)
         for possible_metadata in versions:
             if show:
                 log(f'check: {link(possible_metadata.parent.as_uri(),possible_metadata.parent.name + " (open dir)")}') 
@@ -713,7 +714,7 @@ def main():
 if __name__ == "__main__":
     error('Please run rhdndat or rhdndat-rn instead of running the script directly')
     raise typer.Abort()
-    
+
 
 
 #from chd import chd_read_header, chd_open, ChdError
