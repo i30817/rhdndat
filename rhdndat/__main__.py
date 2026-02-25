@@ -621,8 +621,12 @@ def get_romhacking_data(possible_metadata, session):
     metadata = []
     language = None
     version_hacks = read_version_file(possible_metadata)
-
-    for (version, url) in version_hacks:
+    #loop that can iterate on the same place with a continue without next
+    sentinel = object()
+    iterobj = iter(version_hacks)
+    x = next(iterobj, sentinel)
+    while x is not sentinel:
+        (version, url) = x
         try:
             response = session.get(url, headers={'User-Agent': 'Mozilla/5.0'})
             page = response.text
@@ -668,7 +672,15 @@ def get_romhacking_data(possible_metadata, session):
 
             if remote_version != version:
                 warn(f'warn: local \'{version}\' {link(possible_metadata.parent.as_uri(),"(open dir)")} != remote \'{remote_version}\' {link(url, "(open url)")} versions')
+            #advance loop, most exceptions exit the loop
+            x = next(iterobj, sentinel)
         except (requests.exceptions.RequestException, AttributeError) as e:
+            if response.status_code == 403:
+                error("error: blocked by cloudflare (403 Forbidden)")
+            elif response.status_code == 429:
+                error("error: rate limited by cloudflare (429 Too Many Requests)")
+                #doesnt advance the loop, returns to retry later (the session has a limiter already)
+                continue
             raise VersionFileURLError(possible_metadata, url)
     return (metadata, language)
 
