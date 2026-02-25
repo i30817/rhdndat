@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import mimetypes
 import requests
+from requests_ratelimiter import LimiterSession
 from pathlib import Path
 from hashlib import sha1
 import re
@@ -296,6 +297,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             ext: Optional[List[str]] = typer.Option(['a78', 'd64', 'crt', 'hdi', 'fdi', 'ngc', 'ws', 'wsc', 'pce', 'gb', 'gba', 'gbc', 'n64', 'v64', 'z64', '3ds', 'nds', 'nes', 'unh', 'lnx', 'fds', 'sfc', 'smc', 'bs', 'nsp', '32x', 'gg', 'sms', 'md', 'iso', 'dim', 'adf', 'ipf', 'dsi', 'wad', 'cue', 'gdi', 'toc', 'rvz'], help='ROM extensions to find names of, can be repeated. Note that you can ommit this argument to get the predefined list.'),
             force: bool = typer.Option(False, '--force', help='Force a recalculation and store of checksum (on windows the calculation always happens).'),
             norename: bool = typer.Option(False, '--no-rename', help='Check and store checksums only.'),
+            showhacks: bool = typer.Option(False, '--show-hacks', help='Show renames for files without parentheses (a good indicator for hacks, if you want to keep renames for translations anyway, keep the original name for them).')
             verbose: bool = typer.Option(False, '--verbose', help='Print more information about skipped roms.')
             ):
     """
@@ -505,7 +507,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
             if errors or not games:
                 warn(f'incomplete/undatted: {link(rom.parent.as_uri(),rom.name + " (open dir)")} has no match in dats {link(xmlpath.as_uri(),"(open)")}')
                 continue
-            if norename:
+            if norename or (not showhacks and '(' not in rom.name):
                 continue
             
             #turn back to list to use with the questionary api
@@ -676,19 +678,19 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
     ):
     """
     romhacking.net update checker
-    
+
     rhdndat finds rhdndat.ver files to check for romhacking.net updates
 
     A version file is named rhdndat.ver and has a version number line followed by a romhacking.net url line, repeated. These correspond to each hack or translation. To check for needed updates to version file, if any patch version in the file does not match the version on the romhacking.net patch page, it presents a warning.
 
     To update this program to the latest release with pip installed, type:
-    
+
     pip install --force-reinstall rhdndat
     """
-    
+
     versions = romdir.glob("**/rhdndat.ver")
     try:
-        session = requests.Session()
+        session = LimiterSession(per_minute=20, burst=4)
         for possible_metadata in versions:
             if show:
                 log(f'check: {link(possible_metadata.parent.as_uri(),possible_metadata.parent.name + " (open dir)")}') 
@@ -713,7 +715,7 @@ def main():
 if __name__ == "__main__":
     error('Please run rhdndat or rhdndat-rn instead of running the script directly')
     raise typer.Abort()
-    
+
 
 
 #from chd import chd_read_header, chd_open, ChdError
