@@ -711,7 +711,7 @@ def versioncheck(romdir: Path = typer.Argument(..., exists=True, file_okay=False
 
     versions = romdir.glob("**/rhdndat.ver")
     try:
-        session = LimiterSession(per_minute=20, burst=4)
+        session = LimiterSession(per_second=(2/3), burst=3)
         for possible_metadata in versions:
             if show:
                 log(f'check: {link(possible_metadata.parent.as_uri(),possible_metadata.parent.name + " (open dir)")}') 
