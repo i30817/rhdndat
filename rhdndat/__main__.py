@@ -377,9 +377,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     combined_dict = getChecksumDict(xmls)
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
-    #redump is no longer skipping headers in checksums.
+    #nointro is no longer skipping headers in checksums.
     headers = {}
-    savedtracks = set() #saves track files to prevent them being processed twice
+    savedtracks = set() #some track files have valid rom extensions, this is to prevent them being checked twice
     sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
     for (root,dirs,dirfiles) in os.walk(romdir, topdown=True):
         #don't walk down forbidden directories, backwards delete in place for os.walk to be notified
@@ -416,9 +416,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 #instead of considering just the 'rom' file, consider also all file referenced inside cue or gdi or toc
                 #since toc and cue can have a single 'file' but multiple 'tracks' this needs a ordered set
                 if rom.suffix == '.gdi':
-                    regex = '"(.*)"'
+                    regex = r'"(.*)"'
                 else:
-                    regex = 'FILE\s+"(.*)"'
+                    regex = r'FILE\s+"(.*)"'
                 class TrackAlreadyCheckedError(ValueError):
                     '''already checked'''
                 def track_constructor(st):
@@ -427,7 +427,8 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         tmp = Path(rom.parent, tmp)
                     tmp = tmp.resolve()
                     if not tmp.is_file():
-                        raise ValueError('track must be a file')
+                        error(f'{tmp} track must be a file')
+                        raise ValueError()
                     if tmp in savedtracks:
                         raise TrackAlreadyCheckedError()
                     savedtracks.add(tmp)
@@ -437,7 +438,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
                 except TrackAlreadyCheckedError:
                     errors = True
-                    error('error: track(s) were checked before, may be caused by multiple files using them '
+                    error('error: track(s) were checked before, may be caused by a track file in a different directory subtree than its index file '
                           f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                 except:
                     errors = True
