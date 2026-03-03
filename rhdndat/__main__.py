@@ -416,9 +416,9 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                 #instead of considering just the 'rom' file, consider also all file referenced inside cue or gdi or toc
                 #since toc and cue can have a single 'file' but multiple 'tracks' this needs a ordered set
                 if rom.suffix == '.gdi':
-                    regex = '"(.*)"'
+                    regex = r'"(.*)"'
                 else:
-                    regex = 'FILE\s+"(.*)"'
+                    regex = r'FILE\s+"(.*)"'
                 class TrackAlreadyCheckedError(ValueError):
                     '''already checked'''
                 def track_constructor(st):
