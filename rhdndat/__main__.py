@@ -379,7 +379,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
     #nointro is no longer skipping headers in checksums.
     headers = {}
-    savedtracks = set() #saves track files to prevent them being processed twice
+    savedtracks = set() #some track files have valid rom extensions, this is to prevent them being checked twice
     sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
     for (root,dirs,dirfiles) in os.walk(romdir, topdown=True):
         #don't walk down forbidden directories, backwards delete in place for os.walk to be notified
@@ -427,7 +427,8 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                         tmp = Path(rom.parent, tmp)
                     tmp = tmp.resolve()
                     if not tmp.is_file():
-                        raise ValueError('track must be a file')
+                        error(f'{tmp} track must be a file')
+                        raise ValueError()
                     if tmp in savedtracks:
                         raise TrackAlreadyCheckedError()
                     savedtracks.add(tmp)
@@ -437,7 +438,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
                     files = list(map( track_constructor, OrderedDict.fromkeys(re.findall(regex, index_txt)).keys() ))
                 except TrackAlreadyCheckedError:
                     errors = True
-                    error('error: track(s) were checked before, may be caused by multiple files using them '
+                    error('error: track(s) were checked before, may be caused by a track file in a different directory subtree than its index file '
                           f'{link(rom.as_uri(),"(open cue/toc/gdi)")} {link(rom.parent.as_uri(),"(open dir)")}')
                 except:
                     errors = True
