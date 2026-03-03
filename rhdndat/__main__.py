@@ -377,7 +377,7 @@ def renamer(romdir: Path = typer.Argument(..., exists=True, file_okay=False, dir
 
     combined_dict = getChecksumDict(xmls)
     ext = list(map( lambda s: s.lower() if s.startswith('.') else '.' + s.lower(), ext))
-    #redump is no longer skipping headers in checksums.
+    #nointro is no longer skipping headers in checksums.
     headers = {}
     savedtracks = set() #saves track files to prevent them being processed twice
     sortd = { '.cue':1, '.gdi':2, '.toc':3 } #zero is falsy so it shouldn't be used for this sort trick
