@@ -688,7 +688,7 @@ def get_romhacking_data(possible_metadata, session):
             x = next(iterobj, sentinel)
         except requests.exceptions.RequestException as e:
                 error("error: no response, check your connection")
-                continue
+                x = next(iterobj, sentinel)
         except requests.exceptions.HTTPError as e:
             if response.status_code == 429:
                 error("error: rate limited by cloudflare (429 Too Many Requests)")
