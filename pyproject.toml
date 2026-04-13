@@ -30,7 +30,7 @@ rhdndat-rn = 'rhdndat.__main__:rename'
 "Bug Tracker" = 'https://github.com/i30817/rhdndat/issues'
 
 [tool.poetry.dev-dependencies]
-pytest = "^7.2.0"
+pytest = "^9.0.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
